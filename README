@@ -1,0 +1,2 @@
+- /venv/Scripts contains many helpful scripts used in designing/updating this software (mostly pyside6 tools)
+- https://www.pythonguis.com/tutorials/pyside6-embed-pyqtgraph-custom-widgets/
