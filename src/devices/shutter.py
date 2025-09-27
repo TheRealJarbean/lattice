@@ -1,40 +1,39 @@
+# TODO: Make terminate->running command somehow non-blocking or just accept 20ms freeze on send
+
 from core.serial_worker import SerialWorker
-from enum import Enum
-import queue
+import time
 
-class State(Enum):
-    """This is for readability so that closed and open are never confused"""
-    OPEN = True
-    CLOSED = False
-
-class Shutters(SerialWorker):
-    ser = SerialWorker("COM10")
-
-    def __init__(self, address):
+class Shutters():
+    """Shutters currently use COM8"""
+    
+    def __init__(self, address, ser: SerialWorker):
+        self.ser = ser
         self.address = address
-        self.state = State.CLOSED
-        self.command_queue = queue.Queue()
+        self.is_open = False
 
     def toggle(self):
-        if self.state == State.OPEN:
+        if self.is_open:
             self.close()
-        if self.state == State.CLOSED:
+        if not self.is_open:
             self.open()
 
-    def send_next_command(self):
-        if self.command_queue.empty():
-            return
-        
-        self.send_command(self.command_queue.get())
-
-    def send_command(self):
-        pass
+    def send_command(self, cmd):
+        self.ser.send_message(f'{cmd}\r\n'.encode('utf-8'))
 
     def reset(self):
-        pass
+        self.send_command(f'/{self.address}TR')
+        time.sleep(20)
+        self.send_command(f'/{self.address}e0R')
+        self.is_open = False
 
     def open(self):
-        pass
+        self.send_command(f'/{self.address}TR')
+        time.sleep(20)
+        self.send_command(f'/{self.address}e7R')
+        self.is_open = True
 
     def close(self):
-        pass
+        self.send_command(f'/{self.address}TR')
+        time.sleep(20)
+        self.send_command(f'/{self.address}e8R')
+        self.is_open = False

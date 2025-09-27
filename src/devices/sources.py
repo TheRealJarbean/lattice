@@ -1,7 +1,8 @@
 from core.serial_worker import SerialWorker
 
 class Source:
-    def __init__(self, address):
+    def __init__(self, address, ser: SerialWorker):
+        self.ser = ser
         self.address = address
         self.setpoint = 0
         self.ramp_rate = 0.0
@@ -21,4 +22,4 @@ class Source:
         self.safe_rr_to = safe_rr_to
 
     def set_setpoint(self, setpoint):
-        
+        pass
