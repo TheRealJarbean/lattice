@@ -1,50 +1,57 @@
 # Base class for all devices using serial I/O, defines common communication parameters
-from PySide6.QtCore import QObject, Slot, Signal
+from PySide6.QtCore import QObject, QTimer
 import serial
-import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SerialWorker(QObject):
-    response_received = Signal(str)
-    error_occurred = Signal(str)
-    finished = Signal()
-
-    def __init__(self, port: str, baudrate: int = 9600):
+    def __init__(self, port: str, baudrate: int = 9600, monitor_func=None):
         super().__init__()
-        self._running = False
         self.port = port
+        self.monitor_func = monitor_func
         self.baudrate = baudrate
         self.ser = None
 
-    @Slot()
-    def start_worker(self):
-        """Start the serial connection and event loop"""
+        # Open the serial connection
         try:
-            self.ser = serial.Serial(self.port, self.baudrate, timeout = 0.1)
-            self._running = True
-            while self._running:
-                if self.ser.in_waiting:
-                    data = self.ser.readline().decode(errors='ignore').strip()
-                    if data:
-                        self.response_received.emit(data)
-                time.sleep(0.01) # Prevent CPU hogging
+            self.ser = serial.Serial(self.port, self.baudrate, timeout = 0.1, write_timeout=1)
         except Exception as e:
-            self.error_occurred.emit(str(e))
-        finally:
-            if self.ser and self.ser.is_open:
-                self.ser.close()
-            self.finished.emit()
+            print(f"Error occurred when opening serial port: {e}")
 
-    @Slot()
-    def send_message(self, msg):
+        # Set up timer for checking received data
+        self.timer = QTimer()
+        self.timer.setInterval(200)  # Poll every 200 ms
+        self.timer.timeout.connect(self.check_serial_data)
+
+    def start_monitor(self):
+        if not self.timer.isActive():
+            self.timer.start()
+
+    def stop_monitor(self):
+        if self.timer.isActive():
+            self.stop()
+
+    def check_serial_data(self):
+        try:
+            if self.ser.in_waiting:
+                data = self.ser.readline().decode(errors='ignore').strip()
+                if data:
+                    self.monitor_func(data)
+                    logger.debug(f"{self.port} I: {data}")
+        except Exception as e:
+            print(f"Error occurred in serial monitoring: {e}")
+
+    def send(self, msg):
         """Send a message to the serial port."""
         if self.ser and self.ser.is_open:
             try:
                 # Add a newline or protocol-specific ending if needed
                 self.ser.write(msg.encode('utf-8'))
+                logger.debug(f"{self.port} O: {msg}")
             except Exception as e:
-                self.error_occurred.emit(f"Send error: {e}")
+                print(f"Error in sending serial data on port {self.port}: {e}")
 
-    @Slot()
-    def stop_worker(self):
-        """Stop the worker thread gracefully."""
-        self._running = False
+    def finish(self):
+        if self.ser and self.ser.is_open:
+                self.ser.close()

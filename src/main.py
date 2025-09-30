@@ -8,10 +8,7 @@ import logging
 import os
 
 # Local imports
-from core.serial_worker import SerialWorker
-from devices.pressure import Pressure
-from devices.shutter import Shutter
-from devices.source import Source
+from devices.shutter import ShutterManager
 
 # Set the log level based on env variable when program is run
 # Determines which logging statements are printed to console
@@ -26,14 +23,14 @@ LOG_LEVEL_MAP = {
     "NOTSET": logging.NOTSET,
 }
 
+logging.basicConfig(level=LOG_LEVEL_MAP[LOG_LEVEL])
+
 uiclass, baseclass = pg.Qt.loadUiType("src/gui/main.ui")
 
 # Shutter objects
-shutter_serial_worker = SerialWorker("COM8")
-shutters = {
-    "gallium" : Shutter(0, shutter_serial_worker),
-    "aluminum" : Shutter(1, shutter_serial_worker)
-}
+shutters = ShutterManager("COM5")
+shutters.add_shutter("gallium", 0)
+shutters.add_shutter("aluminum", 1)
 
 class MainWindow(uiclass, baseclass):
     def __init__(self):
@@ -47,8 +44,8 @@ class MainWindow(uiclass, baseclass):
         }
         
         for key in shutter_controls:
-            shutter_controls[key].open_button.clicked.connect(shutters[key].open)
-            shutter_controls[key].close_button.clicked.connect(shutters[key].close)
+            shutter_controls[key].open_button.clicked.connect(lambda: shutters.open(key))
+            shutter_controls[key].close_button.clicked.connect(lambda: shutters.close(key))
 
         # Data storage
         self.start_time = time.time()
