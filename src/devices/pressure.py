@@ -1,5 +1,8 @@
 from core.serial_worker import SerialWorker
 from enum import Enum
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Pressure:
     """
@@ -16,6 +19,7 @@ class Pressure:
         self.is_on = False
         
     def send_command(self, cmd):
+        logger.debug(f"Pressure {self.address} sending on {self.ser.port}: {cmd}")
         self.ser.send_message(f'{cmd}\r\n'.encode('utf-8'))
 
     def update_rate(self):

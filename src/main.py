@@ -4,6 +4,21 @@ from PySide6 import QtCore
 import pyqtgraph as pg
 import numpy as np
 import time
+import logging
+import os
+
+# Set the log level based on env variable when program is run
+# Ex. LOG_LEVEL=DEBUG python main.py
+# Determines which logging statements are printed to console
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_LEVEL_MAP = {
+    "CRITICAL": logging.CRITICAL,
+    "ERROR": logging.ERROR,
+    "WARNING": logging.WARNING,
+    "INFO": logging.INFO,
+    "DEBUG": logging.DEBUG,
+    "NOTSET": logging.NOTSET,
+}
 
 uiclass, baseclass = pg.Qt.loadUiType("src/gui/main.ui")
 

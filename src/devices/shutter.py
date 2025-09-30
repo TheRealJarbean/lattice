@@ -2,6 +2,9 @@
 
 from core.serial_worker import SerialWorker
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Shutters():
     """Shutters currently use COM8"""
@@ -18,6 +21,7 @@ class Shutters():
             self.open()
 
     def send_command(self, cmd):
+        logger.debug(f"Pressure {self.address} sending on {self.ser.port}: {cmd}")
         self.ser.send_message(f'{cmd}\r\n'.encode('utf-8'))
 
     def reset(self):

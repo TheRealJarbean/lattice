@@ -1,1 +1,0 @@
-# Base class for use by modbus devices (eurotherm only at time of writing)
