@@ -5,3 +5,4 @@ How to use logger:
 - In the top level (main) file the logger is configured
 - In every other module, logger is imported and set to logging.getLogger(__name__) (__name__ automatically names the logger after the file it is in, allowing for easy tracing)
 - logger.debug(statement) allows printing of debug statements only in debug mode across entire application
+- Run application with "$env:LOG_LEVEL = "DEBUG"; python ./src/main.py"

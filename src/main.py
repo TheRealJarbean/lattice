@@ -7,9 +7,15 @@ import time
 import logging
 import os
 
+# Local imports
+from core.serial_worker import SerialWorker
+from devices.pressure import Pressure
+from devices.shutter import Shutter
+from devices.source import Source
+
 # Set the log level based on env variable when program is run
-# Ex. LOG_LEVEL=DEBUG python main.py
 # Determines which logging statements are printed to console
+# Only level used at time of writing is DEBUG
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_LEVEL_MAP = {
     "CRITICAL": logging.CRITICAL,
@@ -22,10 +28,27 @@ LOG_LEVEL_MAP = {
 
 uiclass, baseclass = pg.Qt.loadUiType("src/gui/main.ui")
 
+# Shutter objects
+shutter_serial_worker = SerialWorker("COM8")
+shutters = {
+    "gallium" : Shutter(0, shutter_serial_worker),
+    "aluminum" : Shutter(1, shutter_serial_worker)
+}
+
 class MainWindow(uiclass, baseclass):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
+        
+        # Shutter UI control assignments
+        shutter_controls = {
+            "gallium" : self.shutter_controls_0,
+            "aluminum" : self.shutter_controls_1
+        }
+        
+        for key in shutter_controls:
+            shutter_controls[key].open_button.clicked.connect(shutters[key].open)
+            shutter_controls[key].close_button.clicked.connect(shutters[key].close)
 
         # Data storage
         self.start_time = time.time()
@@ -56,10 +79,10 @@ class MainWindow(uiclass, baseclass):
         # new_y = np.sin(current_time) + np.random.normal(scale=0.1)  # noisy sine wave
 
         # Display most recent values
-        self.growth_display.display(f"{new_y[0]:.2f}")
-        self.flux_display.display(f"{new_y[1]:.2f}")
-        self.intro_display.display(f"{new_y[2]:.2f}")
-        self.thermocouple_display.display(f"{new_y[3]:.2f}")
+        self.growth_display.setText(f"{new_y[0]:.2f}")
+        self.flux_display.setText(f"{new_y[1]:.2f}")
+        self.intro_display.setText(f"{new_y[2]:.2f}")
+        self.thermocouple_display.setText(f"{new_y[3]:.2f}")
 
         # Append new data
         self.x_data = np.append(self.x_data, new_x)

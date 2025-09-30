@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class Shutters():
+class Shutter():
     """Shutters currently use COM8"""
     
     def __init__(self, address, ser: SerialWorker):
@@ -26,18 +26,18 @@ class Shutters():
 
     def reset(self):
         self.send_command(f'/{self.address}TR')
-        time.sleep(20)
+        time.sleep(0.02)
         self.send_command(f'/{self.address}e0R')
         self.is_open = False
 
     def open(self):
         self.send_command(f'/{self.address}TR')
-        time.sleep(20)
+        time.sleep(0.02)
         self.send_command(f'/{self.address}e7R')
         self.is_open = True
 
     def close(self):
         self.send_command(f'/{self.address}TR')
-        time.sleep(20)
+        time.sleep(0.02)
         self.send_command(f'/{self.address}e8R')
         self.is_open = False
