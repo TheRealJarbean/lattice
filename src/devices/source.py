@@ -3,6 +3,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+addresses = {
+    "loop_1_pid_td" : 33474
+}
+
 class Source:
     # TODO: Figure out addresses of these values (using itools?)
     modbus_addresses = {
@@ -30,8 +34,10 @@ class Source:
         res = self.client.read_holding_registers(address=self.modbus_addresses['ramp_rate'], count=1, device_id=self.id)
         return res.registers[int(1)]
 
-    def set_setpoint(self, setpoint):
-        self.client.write_register(address=self.modbus_addresses['setpoint'], device_id=self.id, value=ramp_rate)
+    def set_setpoint(self, setpoint, limit=200):
+        if setpoint > 200:
+            setpoint = 200
+        self.client.write_register(address=self.modbus_addresses['setpoint'], device_id=self.id, value=setpoint)
         self.setpoint = setpoint
 
     def set_ramp_rate(self, ramp_rate):

@@ -28,7 +28,7 @@ logging.basicConfig(level=LOG_LEVEL_MAP[LOG_LEVEL])
 uiclass, baseclass = pg.Qt.loadUiType("src/gui/main.ui")
 
 # Shutter objects
-shutters = ShutterManager("COM5")
+shutters = ShutterManager("COM300")
 shutters.add_shutter("gallium", 0)
 shutters.add_shutter("aluminum", 1)
 
