@@ -1,24 +1,15 @@
 import sys
-from PySide6.QtWidgets import QApplication, QLCDNumber
+from PySide6.QtWidgets import QApplication, QWidget
 from PySide6 import QtCore
 import pyqtgraph as pg
 import numpy as np
 import time
 import logging
 import os
-import configparser
+import yaml
 
 # Local imports
 from devices.shutter import ShutterManager
-
-# Get the directory of this script and set other important directories
-base_dir = os.path.dirname(os.path.abspath(__file__))
-config_path = os.path.join(base_dir, 'config', 'default.ini')
-main_ui_path = os.path.join(base_dir, 'gui', 'main.ui')
-
-# Load config file
-config = configparser.ConfigParser()
-config.read(config_path)
 
 # Set the log level based on env variable when program is run
 # Determines which logging statements are printed to console
@@ -35,12 +26,21 @@ LOG_LEVEL_MAP = {
 
 logging.basicConfig(level=LOG_LEVEL_MAP[LOG_LEVEL])
 
-uiclass, baseclass = pg.Qt.loadUiType(main_ui_path)
+# Get the directory of this script and set other important directories
+base_dir = os.path.dirname(os.path.abspath(__file__))
+config_path = os.path.join(base_dir, 'config', 'default.yaml')
+main_ui_path = os.path.join(base_dir, 'gui', 'main.ui')
 
-# Shutter objects
-shutters = ShutterManager("COM300")
-shutters.add_shutter("gallium", 0)
-shutters.add_shutter("aluminum", 1)
+# Load config file
+with open(config_path, 'r') as f:
+    config = yaml.safe_load(f)
+
+# Create shutter objects
+shutters = ShutterManager(config['serial']['shutters']['port'])
+for shutter in config['devices']['shutters']:
+    shutters.add_shutter(shutter['name'], shutter['address'])
+
+uiclass, baseclass = pg.Qt.loadUiType(main_ui_path)
 
 class MainWindow(uiclass, baseclass):
     def __init__(self):
@@ -48,14 +48,10 @@ class MainWindow(uiclass, baseclass):
         self.setupUi(self)
         
         # Shutter UI control assignments
-        shutter_controls = {
-            "gallium" : self.shutter_controls_0,
-            "aluminum" : self.shutter_controls_1
-        }
-        
-        for key in shutter_controls:
-            shutter_controls[key].open_button.clicked.connect(lambda: shutters.open(key))
-            shutter_controls[key].close_button.clicked.connect(lambda: shutters.close(key))
+        for i, shutter in enumerate(config['devices']['shutters']):
+            print(f"Assigning: {i} {shutter['name']}")
+            controls = self.findChild(QWidget, f"shutter_controls_{i}")
+            controls.open_button.clicked.connect(lambda _, s=shutter['name']: shutters.open(s))
 
         # Data storage
         self.start_time = time.time()

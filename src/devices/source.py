@@ -3,13 +3,18 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-addresses = {
+loop_1_addresses = {
     "loop_1_pid_td" : 33474
+}
+
+loop_2_addresses = {
+
 }
 
 class Source:
     def __init__(self, device_id):
         self.device_id = device_id
+        self.loop
         self.setpoint
         self.setpoint = 0.0
         self.ramp_rate = 0.0
@@ -22,13 +27,17 @@ class SourceManager:
         self.sources = {}
         self.ser = ModbusClient(port=port, baudrate=baudrate)
         
-    def add_source(self, name: str, device_id: int):
+    def add_source(self, name: str, device_id: int, loop: int):
         if name in self.sources:
             logger.debug("Name already exists in source list")
             return
         
         if device_id in self.sources.values():
             logger.debug("Device id already exists in source list")
+            return
+        
+        if loop != 1 and loop != 2:
+            logger.debug("Loop must be 1 or 2")
             return
         
         self.sources[name] = device_id
