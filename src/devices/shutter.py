@@ -13,16 +13,23 @@ class Shutter():
 
 class ShutterManager():
     """Shutters currently use COM8"""
-    def __init__(self, port="COM8", baudrate=9600):
+    def __init__(self, port, baudrate=9600):
         self.ser = SerialWorker(port, baudrate, monitor_func=self.on_serial_data_received)
         self.shutters = {}
 
     def add_shutter(self, name, address):
-        if name in self.shutters.keys():
-            logger.debug("Name already exists in shutters")
+        if name in self.shutters:
+            logger.debug("Name already exists in shutters list")
+            return
+        
+        if address in self.shutters.values():
+            logger.debug("Address already exists in shutters list")
             return
         
         self.shutters[name] = Shutter(address)
+        
+    def send_command(self, cmd):
+        self.ser.send(f'{cmd}\r\n')
 
     def start_monitor(self):
         self.ser.start_monitor()
@@ -38,9 +45,6 @@ class ShutterManager():
             self.close(name)
         if not self.is_open:
             self.open(name)
-
-    def send_command(self, cmd):
-        self.ser.send(f'{cmd}\r\n')
 
     def reset(self, name):
         address = self.shutters[name].address

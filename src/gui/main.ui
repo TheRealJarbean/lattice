@@ -14,8 +14,8 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QGridLayout" name="gridLayout_7">
-    <item row="0" column="0">
+   <layout class="QHBoxLayout" name="horizontalLayout_2">
+    <item>
      <widget class="QTabWidget" name="tabWidget">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -24,7 +24,7 @@
        </sizepolicy>
       </property>
       <property name="currentIndex">
-       <number>2</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="pressure_tab">
        <attribute name="title">
@@ -238,18 +238,23 @@ color: rgb(255, 255, 255);</string>
              <property name="horizontalSpacing">
               <number>4</number>
              </property>
-             <item row="0" column="2">
-              <spacer name="horizontalSpacer_3">
-               <property name="orientation">
-                <enum>Qt::Orientation::Horizontal</enum>
+             <item row="0" column="3">
+              <widget class="QLabel" name="label_6">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
                </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
+               <property name="text">
+                <string>**Rate (/sec)**</string>
                </property>
-              </spacer>
+               <property name="textFormat">
+                <enum>Qt::TextFormat::MarkdownText</enum>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
+               </property>
+              </widget>
              </item>
              <item row="0" column="1">
               <widget class="QPushButton" name="pushButton_3">
@@ -269,23 +274,36 @@ color: rgb(255, 255, 255);</string>
                </property>
               </widget>
              </item>
-             <item row="0" column="0">
-              <widget class="QLabel" name="label_5">
-               <property name="font">
-                <font>
-                 <pointsize>7</pointsize>
-                </font>
+             <item row="1" column="0" colspan="5">
+              <widget class="QLabel" name="flux_display">
+               <property name="autoFillBackground">
+                <bool>false</bool>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">background-color: rgb(0, 0, 0);
+font: 30pt &quot;Consolas&quot;;
+color: rgb(255, 255, 255);</string>
                </property>
                <property name="text">
-                <string>**Flux Ion**</string>
-               </property>
-               <property name="textFormat">
-                <enum>Qt::TextFormat::MarkdownText</enum>
+                <string>TextLabel</string>
                </property>
                <property name="alignment">
                 <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
                </property>
               </widget>
+             </item>
+             <item row="0" column="2">
+              <spacer name="horizontalSpacer_3">
+               <property name="orientation">
+                <enum>Qt::Orientation::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
              </item>
              <item row="0" column="4">
               <widget class="QLCDNumber" name="lcdNumber_5">
@@ -302,36 +320,18 @@ color: rgb(255, 255, 255);</string>
                </property>
               </widget>
              </item>
-             <item row="0" column="3">
-              <widget class="QLabel" name="label_6">
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_5">
                <property name="font">
                 <font>
                  <pointsize>7</pointsize>
                 </font>
                </property>
                <property name="text">
-                <string>**Rate (/sec)**</string>
+                <string>**Flux Ion**</string>
                </property>
                <property name="textFormat">
                 <enum>Qt::TextFormat::MarkdownText</enum>
-               </property>
-               <property name="alignment">
-                <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="0" colspan="5">
-              <widget class="QLabel" name="flux_display">
-               <property name="autoFillBackground">
-                <bool>false</bool>
-               </property>
-               <property name="styleSheet">
-                <string notr="true">background-color: rgb(0, 0, 0);
-font: 30pt &quot;Consolas&quot;;
-color: rgb(255, 255, 255);</string>
-               </property>
-               <property name="text">
-                <string>TextLabel</string>
                </property>
                <property name="alignment">
                 <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
@@ -648,38 +648,95 @@ color: rgb(255, 255, 255);</string>
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="tab_2">
+      <widget class="QWidget" name="sources_tab">
        <attribute name="title">
         <string>Sources</string>
        </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_2">
+        <item>
+         <widget class="SourceControlWidget" name="widget" native="true">
+          <property name="styleSheet">
+           <string notr="true">background-color: rgb(0, 255, 0);</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="SourceControlWidget" name="widget_2" native="true"/>
+        </item>
+        <item>
+         <widget class="SourceControlWidget" name="widget_3" native="true"/>
+        </item>
+        <item>
+         <widget class="SourceControlWidget" name="widget_4" native="true"/>
+        </item>
+        <item>
+         <widget class="SourceControlWidget" name="widget_5" native="true"/>
+        </item>
+        <item>
+         <widget class="SourceControlWidget" name="widget_6" native="true"/>
+        </item>
+        <item>
+         <widget class="SourceControlWidget" name="widget_7" native="true">
+          <property name="styleSheet">
+           <string notr="true">background-color: rgb(255, 85, 0);</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="SourceControlWidget" name="widget_8" native="true">
+          <property name="styleSheet">
+           <string notr="true">background-color: rgb(255, 0, 0);</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="SourceControlWidget" name="widget_10" native="true"/>
+        </item>
+        <item>
+         <widget class="SourceControlWidget" name="widget_11" native="true"/>
+        </item>
+        <item>
+         <widget class="PlotWidget" name="source_graph_widget" native="true">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">background-color: rgb(0, 0, 0);</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </widget>
       <widget class="QWidget" name="shutters_tab">
        <attribute name="title">
         <string>Shutters</string>
        </attribute>
-       <layout class="QGridLayout" name="gridLayout_6">
-        <item row="3" column="0">
-         <widget class="ShutterControlWidget" name="shutter_controls_3" native="true"/>
-        </item>
-        <item row="2" column="0">
-         <widget class="ShutterControlWidget" name="shutter_controls_2" native="true"/>
-        </item>
-        <item row="4" column="0">
-         <widget class="ShutterControlWidget" name="shutter_controls_4" native="true"/>
-        </item>
-        <item row="0" column="0">
+       <layout class="QVBoxLayout" name="verticalLayout">
+        <item>
          <widget class="ShutterControlWidget" name="shutter_controls_0" native="true"/>
         </item>
-        <item row="5" column="0">
-         <widget class="ShutterControlWidget" name="shutter_controls_5" native="true"/>
-        </item>
-        <item row="1" column="0">
+        <item>
          <widget class="ShutterControlWidget" name="shutter_controls_1" native="true"/>
         </item>
-        <item row="6" column="0">
+        <item>
+         <widget class="ShutterControlWidget" name="shutter_controls_2" native="true"/>
+        </item>
+        <item>
+         <widget class="ShutterControlWidget" name="shutter_controls_3" native="true"/>
+        </item>
+        <item>
+         <widget class="ShutterControlWidget" name="shutter_controls_4" native="true"/>
+        </item>
+        <item>
+         <widget class="ShutterControlWidget" name="shutter_controls_5" native="true"/>
+        </item>
+        <item>
          <widget class="ShutterControlWidget" name="shutter_controls_6" native="true"/>
         </item>
-        <item row="7" column="0">
+        <item>
          <widget class="ShutterControlWidget" name="shutter_controls_7" native="true"/>
         </item>
        </layout>
@@ -726,7 +783,13 @@ color: rgb(255, 255, 255);</string>
   <customwidget>
    <class>ShutterControlWidget</class>
    <extends>QWidget</extends>
-   <header location="global">gui.shutter_control_widget.h</header>
+   <header>gui.shutter_control_widget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>SourceControlWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">gui.source_control_widget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

@@ -1,4 +1,7 @@
-from PySide6.QtWidgets import QWidget, QLabel, QPushButton, QHBoxLayout
+import sys
+from PySide6.QtWidgets import (
+    QWidget, QLabel, QPushButton, QHBoxLayout, QApplication
+)
 from PySide6.QtCore import Qt
 
 class ShutterControlWidget(QWidget):
@@ -27,3 +30,15 @@ class ShutterControlWidget(QWidget):
         self.label.setAlignment(Qt.AlignVCenter)
 
         self.setLayout(layout)
+        
+# Run as standalone app for testing
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = QWidget()
+    layout = QHBoxLayout()
+    widget = ShutterControlWidget()
+    layout.addWidget(widget)
+    window.setLayout(layout)
+    window.setWindowTitle("Custom Row Widget")
+    window.show()
+    sys.exit(app.exec_())
