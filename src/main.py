@@ -49,6 +49,24 @@ class MainWindow(uiclass, baseclass):
         
         self.shutter_control_button_group.buttonClicked.connect(self.on_button_clicked)
         
+        # Create pressure objects
+        pressure_config = config['devices']['pressure']
+        ser = serial.Serial(
+            port=shutter_config['serial']['port'], 
+            baudrate=shutter_config['serial']['baudrate']
+            )
+        mutex = QtCore.QMutex()
+        
+        self.pressure_reader = SerialReader(ser, mutex)
+        self.pressure_reader.start()
+        self.pressure_gauges = [Pressure(
+            name=gauge['name'], 
+            address=gauge['address'], 
+            ser=ser, 
+            mutex=mutex,
+            ser_reader=self.pressure_reader
+            ) for gauge in pressure_config['connections']]
+        
         # Create shutter objects
         shutter_config = config['devices']['shutters']
         ser = serial.Serial(
@@ -56,6 +74,7 @@ class MainWindow(uiclass, baseclass):
             baudrate=shutter_config['serial']['baudrate']
             )
         mutex = QtCore.QMutex()
+        
         self.shutter_reader = SerialReader(ser, mutex)
         self.shutter_reader.start()
         self.shutters = [Shutter(
@@ -68,6 +87,7 @@ class MainWindow(uiclass, baseclass):
         
         # Create source objects
         self.sources = []
+        
         for source_config in config['devices']['sources'].values():
             client = ModbusSerialClient(
                 port=source_config['serial']['port'], 
