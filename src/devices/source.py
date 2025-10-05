@@ -1,78 +1,98 @@
+from PySide6.QtCore import Signal, QMutex, QThread
 from pymodbus.client.serial import ModbusSerialClient as ModbusClient
 import logging
 
 logger = logging.getLogger(__name__)
 
-loop_1_addresses = {
-    "loop_1_pid_td" : 33474
+MODBUS_ADDRESSES = {
+    "loop_1": {
+        "setpoint": 32772,
+        "setpoint_rate_limit": 32838,
+        "process_variable": 32770,
+        "pid_pb": 33470,
+        "pid_ti": 33472,
+        "pid_td": 33474
+    },
+    "loop_2": {
+        "setpoint": 34820,
+        "setpoint_rate_limit": 34886,
+        "process_variable": 31818,
+        "pid_pb": 35518,
+        "pid_ti": 35520,
+        "pid_td": 35522
+    }
 }
 
-loop_2_addresses = {
-
-}
-
-class Source:
-    def __init__(self, device_id):
-        self.device_id = device_id
-        self.loop
-        self.setpoint
+class Source(QThread):
+    process_variable_changed = Signal(float)
+    setpoint_changed = Signal(float)
+    ramp_rate_changed = Signal(float)
+    safe_ramp_rate_changed = Signal(float)
+    safe_rr_from_changed = Signal(float)
+    safe_rr_to_changed = Signal(float)
+    pid_pb_changed = Signal(float)
+    pid_ti_changed = Signal(float)
+    pid_td_changed = Signal(float)
+    
+    def __init__(self, name, device_id, address_set, client: ModbusClient, mutex: QMutex):
+        super().__init__()
+        
+        if address_set not in MODBUS_ADDRESSES:
+            raise KeyError("Address set not valid")
+        
+        self.name = name
+        self.id = device_id
+        self.addresses = MODBUS_ADDRESSES[address_set]
+        self.process_variable = 0.0
         self.setpoint = 0.0
         self.ramp_rate = 0.0
         self.safe_ramp_rate = 0.0
         self.safe_rr_from = 0.0
         self.safe_rr_to = 0.0
-
-class SourceManager:
-    def __init__(self, port, baudrate=9600):
-        self.sources = {}
-        self.ser = ModbusClient(port=port, baudrate=baudrate)
+        self.pid_pb = 0.0
+        self.pid_ti = 0.0
+        self.pid_td = 0.0
+        self.client = client
+        self.mutex = mutex
         
-    def add_source(self, name: str, device_id: int, loop: int):
-        if name in self.sources:
-            logger.debug("Name already exists in source list")
-            return
-        
-        if device_id in self.sources.values():
-            logger.debug("Device id already exists in source list")
-            return
-        
-        if loop != 1 and loop != 2:
-            logger.debug("Loop must be 1 or 2")
-            return
-        
-        self.sources[name] = device_id
-        
-    def read_data(self, name, address, count=1):
-        id = self.sources[name].id
-        self.client.read_holding_registers(address=address, count=count, device_id=id)
-        
-    def write_data(self, name, address, value):
-        id = self.sources[name].id
-        self.client.write_register(address=address, device_id=id, value=value)
-
-    def monitor(self):
-        for source in self.sources:
-            source.
+    def run(self):
+        self._is_running = True
+        while self._is_running:
+            pass
     
-    def get_setpoint(self, name):
-        res = self.client.read_holding_registers(address=self.modbus_addresses['setpoint'], count=1, device_id=self.id)
+    def stop(self):
+        self._is_running = False
+        
+    def read_data(self, key, count=1):
+        self.mutex.lock()
+        logger.debug(f"Reading {key} from source {self.name}")
+        addresses = self.addresses
+        res = self.client.read_holding_registers(address=addresses[key], count=count, device_id=self.id)
+        self.mutex.unlock()
         return res.registers[int(1)]
+        
+    def write_data(self, key, value):
+        self.mutex.lock()
+        logger.debug(f"Writing {value} to {key} of source {self.name}")
+        addresses = self.addresses
+        self.client.write_register(address=addresses[key], device_id=self.id, value=value)
+        self.mutex.unlock()
     
-    def get_ramp_rate(self, name):
-        res = self.client.read_holding_registers(address=self.modbus_addresses['ramp_rate'], count=1, device_id=self.id)
-        return res.registers[int(1)]
+    def get_setpoint(self):
+        return self.read_data("setpoint")
+    
+    def get_ramp_rate(self):
+        return self.read_data("setpoint_rate_limit")
 
-    def set_setpoint(self, name, setpoint, limit=200):
-        if setpoint > 200:
-            setpoint = 200
-        self.client.write_register(address=self.modbus_addresses['setpoint'], device_id=self.id, value=setpoint)
+    def set_setpoint(self, setpoint):
+        self.write_data("setpoint", setpoint)
         self.setpoint = setpoint
 
-    def set_ramp_rate(self, name, ramp_rate):
-        self.client.write_register(address=self.modbus_addresses['ramp_rate'], device_id=self.id, value=ramp_rate)
+    def set_ramp_rate(self, ramp_rate):
+        self.write_data("setpoint_rate_limit", ramp_rate)
         self.ramp_rate = ramp_rate
 
-    def set_ramp_rate_safety(self, name, safe_ramp_rate, safe_rr_from, safe_rr_to):
+    def set_ramp_rate_safety(self, safe_ramp_rate, safe_rr_from, safe_rr_to):
         self.safe_ramp_rate = safe_ramp_rate
         self.safe_rr_from = safe_rr_from
         self.safe_rr_to = safe_rr_to

@@ -1,5 +1,5 @@
 import sys
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QApplication
 from PySide6 import QtCore
 import pyqtgraph as pg
 import numpy as np
@@ -7,9 +7,14 @@ import time
 import logging
 import os
 import yaml
+import serial
+from pymodbus.client import ModbusSerialClient
 
 # Local imports
-from devices.shutter import ShutterManager
+from devices.shutter import Shutter
+from devices.source import Source
+from devices.pressure import Pressure
+from utils.serial_reader import SerialReader
 
 # Set the log level based on env variable when program is run
 # Determines which logging statements are printed to console
@@ -35,11 +40,6 @@ main_ui_path = os.path.join(base_dir, 'gui', 'main.ui')
 with open(config_path, 'r') as f:
     config = yaml.safe_load(f)
 
-# Create shutter objects
-shutters = ShutterManager(config['serial']['shutters']['port'])
-for shutter in config['devices']['shutters']:
-    shutters.add_shutter(shutter['name'], shutter['address'])
-
 uiclass, baseclass = pg.Qt.loadUiType(main_ui_path)
 
 class MainWindow(uiclass, baseclass):
@@ -47,11 +47,46 @@ class MainWindow(uiclass, baseclass):
         super().__init__()
         self.setupUi(self)
         
+        self.shutter_control_button_group.buttonClicked.connect(self.on_button_clicked)
+        
+        # Create shutter objects
+        shutter_config = config['devices']['shutters']
+        ser = serial.Serial(
+            port=shutter_config['serial']['port'], 
+            baudrate=shutter_config['serial']['baudrate']
+            )
+        mutex = QtCore.QMutex()
+        self.shutter_reader = SerialReader(ser, mutex)
+        self.shutter_reader.start()
+        self.shutters = [Shutter(
+            name=shutter['name'], 
+            address=shutter['address'], 
+            ser=ser, 
+            mutex=mutex,
+            ser_reader=self.shutter_reader
+            ) for shutter in shutter_config['connections']]
+        
+        # Create source objects
+        self.sources = []
+        for source_config in config['devices']['sources'].values():
+            client = ModbusSerialClient(
+                port=source_config['serial']['port'], 
+                baudrate=source_config['serial']['baudrate']
+                )
+            mutex = QtCore.QMutex()
+            self.sources.extend([Source(
+                name=device['name'],
+                device_id=device['device_id'],
+                address_set=device['address_set'],
+                client=client,
+                mutex=mutex
+                ) for device in source_config['connections']])
+        
         # Shutter UI control assignments
-        for i, shutter in enumerate(config['devices']['shutters']):
-            print(f"Assigning: {i} {shutter['name']}")
-            controls = self.findChild(QWidget, f"shutter_controls_{i}")
-            controls.open_button.clicked.connect(lambda _, s=shutter['name']: shutters.open(s))
+        # for i, shutter in enumerate(self.shutters):
+        #     controls = self.findChild(QWidget, f"shutter_controls_{i}")
+        #     controls.open_button.clicked.connect(shutter.open)
+        #     controls.close_button.clicked.connect(shutter.close)
 
         # Data storage
         self.start_time = time.time()
@@ -77,6 +112,15 @@ class MainWindow(uiclass, baseclass):
         self.timer.setInterval(25)  # milliseconds
         self.timer.timeout.connect(self.update_plot)
         self.timer.start()
+        
+    def on_button_clicked(self, button):
+        id = int(button.objectName()[-1])
+        if button.text() == "Closed":
+            button.setText("Open")
+            self.shutters[id].open()
+        else:
+            button.setText("Closed")
+            self.shutters[id].close()
 
     def update_plot(self):
         # Simulate real-time data (you can replace this with sensor/API input)

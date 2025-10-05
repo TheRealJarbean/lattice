@@ -1,80 +1,111 @@
 devices:
   pressure:
-    - name: Growth Ion
-      address: 0
-    - name: Flux Ion
-      address: 1
-    - name: Intro Ion
-      address: 2
-    - name: Intro Thermocouple
-      address: 3
+    serial:
+      port: null
+      baudrate: 9600
+    connections:
+      - name: Growth Ion
+        address: 0
+      - name: Flux Ion
+        address: 1
+      - name: Intro Ion
+        address: 2
+      - name: Intro Thermocouple
+        address: 3
 
   shutters:
-    - name: Aluminum
-      address: 0
-    - name: Scandium
-      address: 1
-    - name: none
-      address: 2
-    - name: Magnesium
-      address: 3
-    - name: Gallium
-      address: 4
-    - name: Indium
-      address: 5
-    - name: Silicon
-      address: 6
-    - name: Beryllium
-      address: 7
+    serial:
+      # port: COM8
+      port: null
+      baudrate: 9600
+    connections:
+      - name: Aluminum
+        address: 0
+      - name: Scandium
+        address: 1
+      - name: none
+        address: 2
+      - name: Magnesium
+        address: 3
+      - name: Gallium
+        address: 4
+      - name: Indium
+        address: 5
+      - name: Silicon
+        address: 6
+      - name: Beryllium
+        address: 7
 
   sources:
-    effusion_cell:
-      - name: Gallium
-        device_id: 0
-      - name: Scandium
-        device_id: 1
-      - name: Beryllium
-        device_id: 2
-      - name: Aluminum
-        device_id: 3
-      - name: Indium
-        device_id: 4
-      - name: Silicon
-        device_id: 5
-      - name: Substrate
-        device_id: 6
-      - name: Intro
-        device_id: 7
-      - name: N/A
-        device_id: 8
+    effusion_cells:
+      serial:
+        # port: COM10
+        port: null
+        baudrate: 9600
+      connections:
+        - name: Gallium
+          device_id: 0
+          address_set: loop_1
+        - name: Scandium
+          device_id: 0
+          address_set: loop_2
+        - name: Beryllium
+          device_id: 1
+          address_set: loop_1
+        - name: Aluminum
+          device_id: 1
+          address_set: loop_2
+        - name: Indium
+          device_id: 2
+          address_set: loop_1
+        - name: Silicon
+          device_id: 2
+          address_set: loop_2
+        - name: Substrate
+          device_id: 3
+          address_set: loop_1
+        - name: Intro
+          device_id: 3
+          address_set: loop_2
     
-    mg_bulk:
-      - name: Mg Bulk PID
-        device_id: 9
-      - name: Mg Bulk DC
-        device_id: 10
+    mg_bulk_pid:
+      serial:
+        # port: COM11
+        port: null
+        baudrate: 9600
+      connections:
+        - name: Mg Bulk PID
+          device_id: 4
+          address_set: loop_1
+        
+
+    mg_bulk_dc:
+      serial:
+        # port: COM12
+        port: null
+        baudrate: 9600
+      connections:
+        - name: Mg Bulk DC
+          device_id: 4
+          address_set: loop_1
     
-    mg_cracker:
-      - name: Mg Cracker PID
-        device_id: 11
-      - name: Mg Cracker DC
-        device_id: 12
+    mg_cracker_pid:
+      serial:
+        # port: COM13
+        port: null
+        baudrate: 9600
+      connections:
+        - name: Mg Cracker PID
+          device_id: 5
+          address_set: loop_1
+        
 
-serial:
-  shutters:
-    port: COM8
-
-  diffusion_cells:
-    port: COM10
-
-  ga_bulk_pid:
-    port: COM11
-
-  ga_bulk_dc:
-    port: COM12
-
-  ga_cracker_pid:
-    port: COM13
-
-  ga_cracker_dc:
-    port: COM14
+    mg_cracker_dc:
+      serial:
+        # port: COM14
+        port: null
+        baudrate: 9600
+      connections:
+        - name: Mg Cracker DC
+          device_id: 5
+          address_set: loop_1
