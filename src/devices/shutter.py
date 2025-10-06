@@ -1,4 +1,4 @@
-from PySide6.QtCore import QThread, QMutex, Signal
+from PySide6.QtCore import QMutex, Signal
 import time
 import logging
 import serial
@@ -8,7 +8,7 @@ from utils.serial_reader import SerialReader
 
 logger = logging.getLogger(__name__)
 
-class Shutter(QThread):
+class Shutter():
     def __init__(self, name: str, address: int, ser: serial.Serial, mutex: QMutex, ser_reader: SerialReader):
         super().__init__()
         self.name = name
@@ -19,22 +19,9 @@ class Shutter(QThread):
         
         ser_reader.data_received.connect(self._handle_ser_message)
         
-    def run(self):
-        """Invoked automatically when self.start() is called in the main thread"""
-        self._is_running = True
-        while self._is_running:
-            pass
-            # Do some stuff like poll shutter state
-    
-    def stop(self):
-        self._is_running = False
-        
     def _handle_ser_message(self, msg: str):
         # TODO: Implement response handling
         logger.debug(msg)
-    
-    def poll_status(self):
-        pass
         
     def send_command(self, cmd):
         """Send a message to the serial port."""

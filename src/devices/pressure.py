@@ -1,4 +1,4 @@
-from PySide6.QtCore import QThread, Signal, QMutex
+from PySide6.QtCore import Signal, QMutex
 import time
 import serial
 import logging
@@ -8,7 +8,7 @@ from utils.serial_reader import SerialReader
 
 logger = logging.getLogger(__name__)
 
-class Pressure(QThread):
+class Pressure():
     """
     Pressure sensors currently use COM6
     Sensor names appear to be T1 I1 I2 and I3
@@ -28,15 +28,6 @@ class Pressure(QThread):
         self.is_on = False
         
         ser_reader.data_received.connect(self._handle_ser_message)
-        
-    def run(self):
-        """Invoked automatically by calling self.start() in the main thread"""
-        self._is_running = True
-        while self._is_running:
-            pass
-    
-    def stop(self):
-        self._is_running = False
         
     def _handle_ser_message(self):
         # TODO: Implement response handling
@@ -82,5 +73,3 @@ class Pressure(QThread):
         time.sleep(0.03)
         self.send(f'#000F')
         time.sleep(0.08)
-
-    

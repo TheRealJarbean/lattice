@@ -1,4 +1,4 @@
-from PySide6.QtCore import Signal, QMutex, QThread
+from PySide6.QtCore import Signal, QMutex
 from pymodbus.client.serial import ModbusSerialClient as ModbusClient
 import logging
 
@@ -23,7 +23,7 @@ MODBUS_ADDRESSES = {
     }
 }
 
-class Source(QThread):
+class Source():
     process_variable_changed = Signal(float)
     setpoint_changed = Signal(float)
     ramp_rate_changed = Signal(float)
@@ -54,14 +54,6 @@ class Source(QThread):
         self.pid_td = 0.0
         self.client = client
         self.mutex = mutex
-        
-    def run(self):
-        self._is_running = True
-        while self._is_running:
-            pass
-    
-    def stop(self):
-        self._is_running = False
         
     def read_data(self, key, count=1):
         self.mutex.lock()
