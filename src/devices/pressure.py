@@ -1,4 +1,4 @@
-from PySide6.QtCore import Signal, QMutex
+from PySide6.QtCore import Signal, QMutex, QObject
 import time
 import serial
 import logging
@@ -8,7 +8,7 @@ from utils.serial_reader import SerialReader
 
 logger = logging.getLogger(__name__)
 
-class Pressure():
+class Pressure(QObject):
     """
     Pressure sensors currently use COM6
     Sensor names appear to be T1 I1 I2 and I3

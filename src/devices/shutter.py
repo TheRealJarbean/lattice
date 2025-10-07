@@ -1,4 +1,4 @@
-from PySide6.QtCore import QMutex, Signal
+from PySide6.QtCore import QMutex, QObject, Signal
 import time
 import logging
 import serial
@@ -8,14 +8,15 @@ from utils.serial_reader import SerialReader
 
 logger = logging.getLogger(__name__)
 
-class Shutter():
+class Shutter(QObject):
+    is_open = Signal(bool)
+    
     def __init__(self, name: str, address: int, ser: serial.Serial, mutex: QMutex, ser_reader: SerialReader):
         super().__init__()
         self.name = name
         self.address = address
         self.ser = ser
         self.mutex = mutex
-        self.is_open = Signal(bool)
         
         ser_reader.data_received.connect(self._handle_ser_message)
         
@@ -40,18 +41,18 @@ class Shutter():
         self.send_command(f'/{address}TR')
         time.sleep(0.02)
         self.send_command(f'/{address}e0R')
-        self.is_open = False
+        self.is_open.emit(False)
 
     def open(self):
         logger.debug(f"Opening shutter {self.address} ({self.name})")
         self.send_command(f'/{self.address}TR')
         time.sleep(0.02)
         self.send_command(f'/{self.address}e7R')
-        self.is_open = True
+        self.is_open.emit(True)
 
     def close(self):
         logger.debug(f"Closing shutter {self.address} ({self.name})")
         self.send_command(f'/{self.address}TR')
         time.sleep(0.02)
         self.send_command(f'/{self.address}e8R')
-        self.is_open = False
+        self.is_open.emit(False)

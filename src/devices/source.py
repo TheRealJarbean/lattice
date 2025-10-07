@@ -1,4 +1,4 @@
-from PySide6.QtCore import Signal, QMutex
+from PySide6.QtCore import Signal, QMutex, QObject
 from pymodbus.client.serial import ModbusSerialClient as ModbusClient
 import logging
 
@@ -23,7 +23,7 @@ MODBUS_ADDRESSES = {
     }
 }
 
-class Source():
+class Source(QObject):
     process_variable_changed = Signal(float)
     setpoint_changed = Signal(float)
     ramp_rate_changed = Signal(float)
