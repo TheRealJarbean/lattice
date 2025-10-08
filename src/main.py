@@ -1,6 +1,7 @@
 import sys
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QTimer, QMutex
+from PySide6.QtWidgets import QApplication, QMenu, QHeaderView, QComboBox
+from PySide6.QtCore import Qt, QTimer, QMutex
+from PySide6.QtGui import QAction
 import pyqtgraph as pg
 import numpy as np
 import time
@@ -183,6 +184,32 @@ class MainWindow(uiclass, baseclass):
             widget = getattr(self, f"state_time_{i}", None)
             if widget:
                 widget.valueChanged.connect()
+                
+        #########################
+        # RECIPE TAB GUI CONFIG #
+        #########################
+        self.recipe_table = getattr(self, "recipe_table", None)
+        
+        # Configure column resizing: first column stretches, others fixed
+        self.recipe_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        for col in range(1, 11):
+            self.recipe_table.horizontalHeader().setSectionResizeMode(col, QHeaderView.Fixed)
+            self.recipe_table.setColumnWidth(col, 100)
+            
+        # Label columns with source names
+        column_names = ["Variable"] + [source.name for source in self.sources]
+        self.recipe_table.setHorizontalHeaderLabels(column_names)
+            
+        # Center content when editing
+        self.recipe_table.itemChanged.connect(lambda item: item.setTextAlignment(Qt.AlignCenter))
+        
+        # Add custom context menu for adding and removing steps
+        self.recipe_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.recipe_table.customContextMenuRequested.connect(self.on_recipe_row_context_menu)
+        
+        # Add dropdown to default row
+        self.add_recipe_variable_dropdown(0)
+        
 
         # Pressure data and plot initialization
         self.pressure_data = {
@@ -207,8 +234,48 @@ class MainWindow(uiclass, baseclass):
         # Set up a timer to update the plot every 5 seconds
         self.timer = QTimer(self)
         self.timer.setInterval(25)  # milliseconds
-        self.timer.timeout.connect(self.update_plot)
+        self.timer.timeout.connect(self.update_pressure_plot)
         self.timer.start()
+    
+    ####################
+    # Pressure Methods #
+    ####################
+    
+    def update_pressure_plot(self):
+        # Simulate real-time data (you can replace this with sensor/API input)
+        current_time = time.time() - self.start_time
+        new_x = current_time
+        new_y = [np.sin(new_x), np.sin(new_x + 90), np.sin(new_x + 180), np.sin(new_x + 270)] # sin wave
+        # new_y = np.sin(current_time) + np.random.normal(scale=0.1)  # noisy sine wave
+
+        # Display most recent values
+        self.growth_display.setText(f"{new_y[0]:.2e}")
+        self.flux_display.setText(f"{new_y[1]:.2e}")
+        self.intro_display.setText(f"{new_y[2]:.2e}")
+        self.thermocouple_display.setText(f"{new_y[3]:.2e}")
+
+        # Append new data
+        self.pressure_data['x'].append(new_x)
+        for i in range(len(new_y)):
+            self.pressure_data['y'][i].append(new_y[i])
+        
+        # Update the plot with new full dataset
+        for i in range(len(self.pressure_curves)):
+            self.pressure_curves[i].setData(np.array(
+                self.pressure_data['x']),
+                self.pressure_data['y'][i]
+                )
+
+        # Optional: auto-scroll x-axis
+        time_lock_checkbox = getattr(self, "pressure_plot_time_lock", None)
+        time_delta_field = getattr(self, "pressure_plot_time_delta", None)
+        time_delta = time_delta_field.value()
+        if time_lock_checkbox.isChecked():
+            # Show last time_delta seconds
+            if new_x >= time_delta:
+                self.pressure_graph_widget.setXRange(max(0, new_x - time_delta), new_x)
+            else:
+                self.pressure_graph_widget.setXRange(max(0, new_x - time_delta), time_delta)
         
     ###################
     # SHUTTER METHODS #
@@ -326,42 +393,53 @@ class MainWindow(uiclass, baseclass):
     def on_shutter_state_change(self, shutter_idx, is_open):
         shutter_output_button = getattr(self, f"shutter_output_button_{shutter_idx}")
         self.toggle_open_close_button(shutter_output_button, not is_open) # Call function as if button was clicked in opposite state
-
-    def update_plot(self):
-        # Simulate real-time data (you can replace this with sensor/API input)
-        current_time = time.time() - self.start_time
-        new_x = current_time
-        new_y = [np.sin(new_x), np.sin(new_x + 90), np.sin(new_x + 180), np.sin(new_x + 270)] # sin wave
-        # new_y = np.sin(current_time) + np.random.normal(scale=0.1)  # noisy sine wave
-
-        # Display most recent values
-        self.growth_display.setText(f"{new_y[0]:.2e}")
-        self.flux_display.setText(f"{new_y[1]:.2e}")
-        self.intro_display.setText(f"{new_y[2]:.2e}")
-        self.thermocouple_display.setText(f"{new_y[3]:.2e}")
-
-        # Append new data
-        self.pressure_data['x'].append(new_x)
-        for i in range(len(new_y)):
-            self.pressure_data['y'][i].append(new_y[i])
+                
+    ##################
+    # RECIPE METHODS #
+    ##################
+    
+    def on_recipe_row_context_menu(self, point):
+        row = self.recipe_table.rowAt(point.y())
+        if row == -1:
+            return # No row under the cursor
         
-        # Update the plot with new full dataset
-        for i in range(len(self.pressure_curves)):
-            self.pressure_curves[i].setData(np.array(
-                self.pressure_data['x']),
-                self.pressure_data['y'][i]
-                )
-
-        # Optional: auto-scroll x-axis
-        time_lock_checkbox = getattr(self, "pressure_plot_time_lock", None)
-        time_delta_field = getattr(self, "pressure_plot_time_delta", None)
-        time_delta = time_delta_field.value()
-        if time_lock_checkbox.isChecked():
-            # Show last time_delta seconds
-            if new_x >= time_delta:
-                self.pressure_graph_widget.setXRange(max(0, new_x - time_delta), new_x)
-            else:
-                self.pressure_graph_widget.setXRange(max(0, new_x - time_delta), time_delta)
+        # Create context menu
+        menu = QMenu(self)
+        
+        # Add row above action
+        add_above = QAction("Add step above", self)
+        add_above.triggered.connect(lambda: self.insert_recipe_row(row))
+        menu.addAction(add_above)
+        
+        # Add row below action
+        add_below = QAction("Add step below", self)
+        add_below.triggered.connect(lambda: self.insert_recipe_row(row + 1))
+        menu.addAction(add_below)
+        
+        # Delete row action
+        # Don't let user delete only row
+        if self.recipe_table.rowCount() != 1:
+            delete_row = QAction("Delete step", self)
+            delete_row.triggered.connect(lambda: self.recipe_table.removeRow(row))
+            menu.addAction(delete_row)
+        
+        # Show menu at global position
+        menu.exec(self.recipe_table.viewport().mapToGlobal(point))
+        
+    def add_recipe_variable_dropdown(self, row):
+        combo = QComboBox()
+        combo.addItems([
+            "SHUTTER",
+            "RAMP_RATE",
+            "SETPOINT",
+            "WAIT_UNTIL_SETPOINT",
+            "WAIT_FOR_SECONDS",
+        ])
+        self.recipe_table.setCellWidget(row, 0, combo)
+        
+    def insert_recipe_row(self, row):
+        self.recipe_table.insertRow(row)
+        self.add_recipe_variable_dropdown(row)
 
 app = QApplication(sys.argv)
 window = MainWindow()

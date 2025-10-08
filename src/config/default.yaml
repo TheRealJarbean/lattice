@@ -1,3 +1,17 @@
+# IMPORTANT: For recipes to function properly, the order of sources and shutters must correspond to one another.
+# The names do not have to match, but the order must match for the devices to associate with one another
+# Ex.
+# shutters:
+#   connections:
+#     - name: Gallium
+#     - name: Aluminum
+#     - name: Beryllium
+# sources:
+#   connections:
+#     - name: Ga
+#     - name: Al
+#     - name: Be
+
 devices:
   pressure:
     serial:
