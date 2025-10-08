@@ -58,13 +58,6 @@ class MainWindow(uiclass, baseclass):
         # Set application start time
         self.start_time = time.time()
         
-        # TODO: Remove this in favor of using spinboxes
-        # Create standard input field validators
-        # self.decimal_validator = QDoubleValidator()
-        # self.decimal_validator.setDecimals(2)
-        # self.decimal_validator.setNotation(QDoubleValidator.StandardNotation)
-        # self.decimal_validator.setRange(bottom=0.0)
-        
         ##################
         # PRESSURE SETUP #
         ##################
