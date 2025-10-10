@@ -40,11 +40,15 @@ logger = logging.getLogger(__name__)
 # Get the directory of this script and set other important directories
 base_dir = os.path.dirname(os.path.abspath(__file__))
 hardware_config_path = os.path.join(base_dir, 'config', 'hardware.yaml')
+theme_config_path = os.path.join(base_dir, 'config', 'theme.yaml')
 main_ui_path = os.path.join(base_dir, 'gui', 'main.ui')
 
-# Load config file
+# Load config files
 with open(hardware_config_path, 'r') as f:
     hardware_config = yaml.safe_load(f)
+    
+with open(theme_config_path, 'r') as f:
+    theme_config = yaml.safe_load(f)
 
 uiclass, baseclass = pg.Qt.loadUiType(main_ui_path)
 
@@ -153,14 +157,21 @@ class MainWindow(uiclass, baseclass):
         # mg_bulk and mg_cracker have separate entries for polling power values for some reason
         # This can be replaced with len(self.sources) if that is changed
         num_unique_sources = 10 
-        for _ in range(num_unique_sources):
-            controls = SourceControlWidget()
+        
+        # Create the source control widgets
+        colors = theme_config['source_tab']['colors']
+        for i in range(num_unique_sources):
+            controls = SourceControlWidget(color=f"#{colors[i]}")
             self.source_controls.append(controls)
             self.source_controls_layout.addWidget(controls)
 
         # Set source name labels
         for i, controls in enumerate(self.source_controls):
             controls.label.setText(self.sources[i].name)
+            
+        # Connect color change methods
+        for i, controls in enumerate(self.source_controls):
+            controls.circle.color_changed.connect(partial(self.on_source_color_change, i))
             
         # Assign modals to PID and Safe Rate Limit buttons
         for i, controls in enumerate(self.source_controls):
@@ -316,6 +327,15 @@ class MainWindow(uiclass, baseclass):
             logger.debug(f"Safe Rate Limit Input {idx} Submitted: {input_modal.get_values()}")
         else:
             logger.debug(f"Safe Rate Limit Input {idx} Cancelled")
+            
+    def on_source_color_change(self, idx, color):
+        logger.debug(f"Changing source {idx} color to {color}")
+        
+        # TODO: Update plot line color
+        
+        # Save color change to config file
+        theme_config['source_tab']['colors'][idx] = color[1:] # Remove leading '#'
+        self.write_theme_config_changes()
         
     ###################
     # SHUTTER METHODS #
@@ -541,6 +561,14 @@ class MainWindow(uiclass, baseclass):
     #     if self.shutter_loop_step_timer.isActive():
     #         self.shutter_loop_step_timer.stop()
     #     self.shutter_loop_step_timer.start(state_time)
+    
+    ################
+    # MISC METHODS #
+    ################
+    
+    def write_theme_config_changes(self):
+        with open(theme_config_path, "w") as f:
+            yaml.dump(theme_config, f, default_flow_style=False)
 
 app = QApplication(sys.argv)
 window = MainWindow()

@@ -4,10 +4,12 @@ from PySide6.QtWidgets import (
     QColorDialog, QHBoxLayout, QApplication
 )
 from PySide6.QtGui import QColor, QPainter, QBrush
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 
 
 class ColorCircle(QLabel):
+    color_changed = Signal(str)
+    
     def __init__(self, color=QColor(0, 0, 0), parent=None):
         super().__init__(parent)
         self.setFixedSize(24, 24)
@@ -18,6 +20,7 @@ class ColorCircle(QLabel):
         new_color = QColorDialog.getColor(self.color, self, "Select Color")
         if new_color.isValid():
             self.color = new_color
+            self.color_changed.emit(new_color.name())
             self.update()
 
     def paintEvent(self, event):
@@ -74,9 +77,6 @@ class SourceControlWidget(QWidget):
         layout.addWidget(self.safety_button)
 
         self.setLayout(layout)
-        
-    def set_color(self, color: QColor):
-        self.circle.color = color
 
 # Run as standalone app for testing
 if __name__ == "__main__":
