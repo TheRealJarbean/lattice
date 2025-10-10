@@ -31,6 +31,7 @@ class Shutter(QObject):
             try:
                 # Add a newline or protocol-specific ending if needed
                 self.ser.write(f"{cmd}\r\n".encode('utf-8'))
+                time.sleep(0.01)
                 logger.debug(f"{self.port} O: {cmd}")
             except Exception as e:
                 print(f"Error in sending serial data on port {self.port}: {e}")
@@ -39,20 +40,17 @@ class Shutter(QObject):
     def reset(self):
         address = self.address
         self.send_command(f'/{address}TR')
-        time.sleep(0.02)
         self.send_command(f'/{address}e0R')
         self.is_open.emit(False)
 
     def open(self):
         logger.debug(f"Opening shutter {self.address} ({self.name})")
         self.send_command(f'/{self.address}TR')
-        time.sleep(0.02)
         self.send_command(f'/{self.address}e7R')
         self.is_open.emit(True)
 
     def close(self):
         logger.debug(f"Closing shutter {self.address} ({self.name})")
         self.send_command(f'/{self.address}TR')
-        time.sleep(0.02)
         self.send_command(f'/{self.address}e8R')
         self.is_open.emit(False)
