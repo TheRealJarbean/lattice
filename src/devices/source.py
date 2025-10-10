@@ -45,10 +45,10 @@ class Source(QObject):
         self.addresses = MODBUS_ADDRESSES[address_set]
         self.process_variable = 0.0
         self.setpoint = 0.0
-        self.ramp_rate = 0.0
-        self.safe_ramp_rate = 0.0
-        self.safe_rr_from = 0.0
-        self.safe_rr_to = 0.0
+        self.rate_limit = 0.0
+        self.safe_rate_limit = 0.0
+        self.safe_rate_limit_from = 0.0
+        self.safe_rate_limit_to = 0.0
         self.pid_pb = 0.0
         self.pid_ti = 0.0
         self.pid_td = 0.0
@@ -73,18 +73,18 @@ class Source(QObject):
     def get_setpoint(self):
         return self.read_data("setpoint")
     
-    def get_ramp_rate(self):
+    def get_rate_limit(self):
         return self.read_data("setpoint_rate_limit")
 
     def set_setpoint(self, setpoint):
         self.write_data("setpoint", setpoint)
         self.setpoint = setpoint
 
-    def set_ramp_rate(self, ramp_rate):
+    def set_rate_limit(self, ramp_rate):
         self.write_data("setpoint_rate_limit", ramp_rate)
-        self.ramp_rate = ramp_rate
+        self.rate_limit = ramp_rate
 
-    def set_ramp_rate_safety(self, safe_ramp_rate, safe_rr_from, safe_rr_to):
-        self.safe_ramp_rate = safe_ramp_rate
-        self.safe_rr_from = safe_rr_from
-        self.safe_rr_to = safe_rr_to
+    def set_rate_limit_safety(self, safe_ramp_rate, safe_rr_from, safe_rr_to):
+        self.safe_rate_limit = safe_ramp_rate
+        self.safe_rate_limit_from = safe_rr_from
+        self.safe_rate_limit_to = safe_rr_to
