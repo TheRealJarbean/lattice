@@ -742,52 +742,10 @@ color: rgb(255, 255, 255);</string>
          </widget>
         </item>
         <item row="1" column="0">
-         <layout class="QVBoxLayout" name="verticalLayout_2">
+         <layout class="QVBoxLayout" name="source_controls">
           <property name="spacing">
            <number>0</number>
           </property>
-          <item>
-           <widget class="SourceControlWidget" name="source_controls_4" native="true"/>
-          </item>
-          <item>
-           <widget class="SourceControlWidget" name="source_controls_6" native="true">
-            <property name="styleSheet">
-             <string notr="true"/>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="SourceControlWidget" name="source_controls_5" native="true"/>
-          </item>
-          <item>
-           <widget class="SourceControlWidget" name="source_controls_7" native="true">
-            <property name="styleSheet">
-             <string notr="true"/>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="SourceControlWidget" name="source_controls_0" native="true">
-            <property name="styleSheet">
-             <string notr="true"/>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="SourceControlWidget" name="source_controls_1" native="true"/>
-          </item>
-          <item>
-           <widget class="SourceControlWidget" name="source_controls_2" native="true"/>
-          </item>
-          <item>
-           <widget class="SourceControlWidget" name="source_controls_8" native="true"/>
-          </item>
-          <item>
-           <widget class="SourceControlWidget" name="source_controls_3" native="true"/>
-          </item>
-          <item>
-           <widget class="SourceControlWidget" name="source_controls_9" native="true"/>
-          </item>
          </layout>
         </item>
         <item row="0" column="0">
@@ -3205,12 +3163,6 @@ QTableWidget::item { text-align: center; }</string>
    <class>PlotWidget</class>
    <extends>QWidget</extends>
    <header>pyqtgraph</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>SourceControlWidget</class>
-   <extends>QWidget</extends>
-   <header location="global">gui.source_control_widget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

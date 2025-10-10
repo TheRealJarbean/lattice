@@ -30,12 +30,12 @@ class ColorCircle(QLabel):
 
 
 class SourceControlWidget(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, color: QColor=QColor("blue"), parent=None):
         super().__init__(parent)
 
         # Create widgets
         self.label = QLabel("Label:")
-        self.circle = ColorCircle(QColor("blue"))
+        self.circle = ColorCircle(color)
         self.input_setpoint = QLineEdit()
         self.input_ramp_rate = QLineEdit()
         self.set_button = QPushButton("Set")

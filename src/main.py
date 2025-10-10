@@ -18,6 +18,8 @@ from devices.shutter import Shutter
 from devices.source import Source
 from devices.pressure import Pressure
 from utils.serial_reader import SerialReader
+from gui.input_modal_widget import InputModalWidget
+from gui.source_control_widget import SourceControlWidget
 
 # Set the log level based on env variable when program is run
 # Determines which logging statements are printed to console
@@ -142,20 +144,31 @@ class MainWindow(uiclass, baseclass):
         # PRESSURE TAB GUI CONFIG #
         ###########################
         
+        #########################
+        # SOURCE TAB GUI CONFIG #
+        #########################
+        
+        self.source_controls_layout = getattr(self, "source_controls", None)
         self.source_controls = []
         # mg_bulk and mg_cracker have separate entries for polling power values for some reason
         # This can be replaced with len(self.sources) if that is changed
         num_unique_sources = 10 
-        for i in range(num_unique_sources):
-            self.source_controls.append(getattr(self, f"source_controls_{i}", None))
+        for _ in range(num_unique_sources):
+            controls = SourceControlWidget()
+            self.source_controls.append(controls)
+            self.source_controls_layout.addWidget(controls)
 
         # Set source name labels
-        for i in range(num_unique_sources):
-            self.source_controls[i].label.setText(self.sources[i].name)
-        
-        #########################
-        # SOURCE TAB GUI CONFIG #
-        #########################
+        for i, controls in enumerate(self.source_controls):
+            controls.label.setText(self.sources[i].name)
+            
+        # Assign modals to PID and Safe Rate Limit buttons
+        for i, controls in enumerate(self.source_controls):
+            logger.debug(i)
+            logger.debug(controls.label.text())
+            controls.pid_button.clicked.connect(partial(self.open_pid_input_modal, i))
+            controls.safety_button.clicked.connect(partial(self.open_safe_rate_limit_input_modal, i))
+            
         
         ###########################
         # SHUTTER TAB GUI CONFIG  #
@@ -289,6 +302,22 @@ class MainWindow(uiclass, baseclass):
     ##################
     # SOURCE METHODS #
     ##################
+    
+    def open_pid_input_modal(self, idx):
+        pid_input_settings = ["1", "2", "3"] # TODO: Ask what these should be
+        input_modal = InputModalWidget(pid_input_settings, 'PID Settings')
+        if input_modal.exec():
+            logger.debug(f"PID Input {idx} Submitted: {input_modal.get_values()}" )
+        else:
+            logger.debug(f"PID Input {idx} Cancelled")
+    
+    def open_safe_rate_limit_input_modal(self, idx):
+        safe_rate_limit_settings = ["From", "To", "Rate Limit"]
+        input_modal = InputModalWidget(safe_rate_limit_settings, 'Safe Rate Limit Settings')
+        if input_modal.exec():
+            logger.debug(f"Safe Rate Limit Input {idx} Submitted: {input_modal.get_values()}")
+        else:
+            logger.debug(f"Safe Rate Limit Input {idx} Cancelled")
         
     ###################
     # SHUTTER METHODS #
