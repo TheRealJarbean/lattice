@@ -1,5 +1,5 @@
 import sys
-from PySide6.QtWidgets import QApplication, QMenu, QHeaderView, QComboBox
+from PySide6.QtWidgets import QApplication, QMenu, QHeaderView, QComboBox, QWidget
 from PySide6.QtCore import Qt, QTimer, QMutex
 from PySide6.QtGui import QAction
 import pyqtgraph as pg
@@ -20,6 +20,7 @@ from devices.pressure import Pressure
 from utils.serial_reader import SerialReader
 from gui.input_modal_widget import InputModalWidget
 from gui.source_control_widget import SourceControlWidget
+from gui.popout_tab_window import PopoutTabWindow
 
 # Set the log level based on env variable when program is run
 # Determines which logging statements are printed to console
@@ -300,6 +301,18 @@ class MainWindow(uiclass, baseclass):
         
         # Add dropdown to default row
         self.add_recipe_variable_dropdown(0)
+        
+        ###################
+        # MISC GUI CONFIG #
+        ###################
+        
+        # Set tab bar context menu
+        tab_widget = getattr(self, "main_tabs", None)
+        tab_widget.tabBar().setContextMenuPolicy(Qt.CustomContextMenu)
+        tab_widget.tabBar().customContextMenuRequested.connect(self.on_tab_context_menu)
+        
+        # Store any popout windows
+        self.popouts = getattr(self, "popouts", {})
     
     ####################
     # Pressure Methods #
@@ -596,6 +609,48 @@ class MainWindow(uiclass, baseclass):
             
     def time_since_start(self):
         return time.monotonic() - self.start_time
+    
+    def on_tab_context_menu(self, point):
+        tab_widget = getattr(self, "main_tabs", None)
+        tab_index = tab_widget.tabBar().tabAt(point)
+        logger.debug(tab_index)
+        
+        if tab_index < 0:
+            return # Didn't click a tab
+        
+        menu = QMenu()
+        popout = QAction("Pop out tab", self)
+        # Discard unneeded "checked" parameter and pass index
+        popout.triggered.connect(lambda _, idx=tab_index: self.pop_out_tab(idx))
+        menu.addAction(popout)
+        
+        # Show menu at global position
+        menu.exec(tab_widget.tabBar().mapToGlobal(point))
+    
+    def pop_out_tab(self, tab_index):
+        tab_widget = getattr(self, "main_tabs", None)
+        tab = tab_widget.widget(tab_index)
+        tab_text = tab_widget.tabText(tab_index)
+        logger.debug(f"Stored tab info {(tab_index, tab, tab_text)}")
+        
+        # Remove tab to re-parent it
+        tab_widget.removeTab(tab_index)
+
+        # Change tab to a window
+        tab.setWindowFlags(Qt.Window)
+        tab.setParent(None)
+        tab.setWindowTitle(tab_text)
+        
+        # Place back in main window on closing popout
+        def on_close(event):
+            tab.setWindowFlags(Qt.Widget)
+            tab_widget.addTab(tab, tab.windowTitle())
+            
+        tab.closeEvent = on_close
+            
+        # Show the popped out tab
+        tab.show()
+        
 
 app = QApplication(sys.argv)
 window = MainWindow()

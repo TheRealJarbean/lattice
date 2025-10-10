@@ -16,7 +16,7 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout_6">
     <item row="0" column="1">
-     <widget class="QTabWidget" name="tabWidget">
+     <widget class="QTabWidget" name="main_tabs">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
         <horstretch>0</horstretch>
@@ -24,7 +24,13 @@
        </sizepolicy>
       </property>
       <property name="currentIndex">
-       <number>3</number>
+       <number>0</number>
+      </property>
+      <property name="tabsClosable">
+       <bool>false</bool>
+      </property>
+      <property name="movable">
+       <bool>true</bool>
       </property>
       <widget class="QWidget" name="pressure_tab">
        <attribute name="title">
