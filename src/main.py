@@ -39,12 +39,12 @@ logger = logging.getLogger(__name__)
 
 # Get the directory of this script and set other important directories
 base_dir = os.path.dirname(os.path.abspath(__file__))
-config_path = os.path.join(base_dir, 'config', 'default.yaml')
+hardware_config_path = os.path.join(base_dir, 'config', 'hardware.yaml')
 main_ui_path = os.path.join(base_dir, 'gui', 'main.ui')
 
 # Load config file
-with open(config_path, 'r') as f:
-    config = yaml.safe_load(f)
+with open(hardware_config_path, 'r') as f:
+    hardware_config = yaml.safe_load(f)
 
 uiclass, baseclass = pg.Qt.loadUiType(main_ui_path)
 
@@ -64,7 +64,7 @@ class MainWindow(uiclass, baseclass):
         ##################
         # PRESSURE SETUP #
         ##################
-        pressure_config = config['devices']['pressure']
+        pressure_config = hardware_config['devices']['pressure']
         ser = serial.Serial(
             port=pressure_config['serial']['port'], 
             baudrate=pressure_config['serial']['baudrate']
@@ -89,7 +89,7 @@ class MainWindow(uiclass, baseclass):
         # is appended
         self.sources = []
         
-        for source_config in config['devices']['sources'].values():
+        for source_config in hardware_config['devices']['sources'].values():
             client = ModbusSerialClient(
                 port=source_config['serial']['port'], 
                 baudrate=source_config['serial']['baudrate']
@@ -106,7 +106,7 @@ class MainWindow(uiclass, baseclass):
         #################
         # SHUTTER SETUP #
         #################
-        shutter_config = config['devices']['shutters']
+        shutter_config = hardware_config['devices']['shutters']
         ser = serial.Serial(
             port=shutter_config['serial']['port'], 
             baudrate=shutter_config['serial']['baudrate']
@@ -164,8 +164,6 @@ class MainWindow(uiclass, baseclass):
             
         # Assign modals to PID and Safe Rate Limit buttons
         for i, controls in enumerate(self.source_controls):
-            logger.debug(i)
-            logger.debug(controls.label.text())
             controls.pid_button.clicked.connect(partial(self.open_pid_input_modal, i))
             controls.safety_button.clicked.connect(partial(self.open_safe_rate_limit_input_modal, i))
             
