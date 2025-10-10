@@ -11,6 +11,7 @@ import yaml
 import serial
 from functools import partial
 from pymodbus.client import ModbusSerialClient
+from math import isclose
 
 # Local imports
 from devices.shutter import Shutter
@@ -78,6 +79,28 @@ class MainWindow(uiclass, baseclass):
             ser_reader=self.pressure_reader
             ) for gauge in pressure_config['connections']]
         
+        ################
+        # SOURCE SETUP #
+        ################
+        # Sources are the only devices that have multiple physical connections
+        # An empty list is created first, then each device on each different connection
+        # is appended
+        self.sources = []
+        
+        for source_config in config['devices']['sources'].values():
+            client = ModbusSerialClient(
+                port=source_config['serial']['port'], 
+                baudrate=source_config['serial']['baudrate']
+                )
+            mutex = QMutex()
+            self.sources.extend([Source(
+                name=device['name'],
+                device_id=device['device_id'],
+                address_set=device['address_set'],
+                client=client,
+                mutex=mutex
+                ) for device in source_config['connections']])
+        
         #################
         # SHUTTER SETUP #
         #################
@@ -114,32 +137,25 @@ class MainWindow(uiclass, baseclass):
         self.shutter_step_time_elapsed_ms = 0
         self.shutter_loop_stopwatch_update_timer = QTimer()
         self.shutter_loop_stopwatch_update_timer.timeout.connect(self.update_shutter_loop_timers)
+
+        ###########################
+        # PRESSURE TAB GUI CONFIG #
+        ###########################
         
-        ################
-        # SOURCE SETUP #
-        ################
-        # Sources are the only devices that have multiple physical connections
-        # An empty list is created first, then each device on each different connection
-        # is appended
-        self.sources = []
+        self.source_controls = []
+        # mg_bulk and mg_cracker have separate entries for polling power values for some reason
+        # This can be replaced with len(self.sources) if that is changed
+        num_unique_sources = 10 
+        for i in range(num_unique_sources):
+            self.source_controls.append(getattr(self, f"source_controls_{i}", None))
+
+        # Set source name labels
+        for i in range(num_unique_sources):
+            self.source_controls[i].label.setText(self.sources[i].name)
         
-        for source_config in config['devices']['sources'].values():
-            client = ModbusSerialClient(
-                port=source_config['serial']['port'], 
-                baudrate=source_config['serial']['baudrate']
-                )
-            mutex = QMutex()
-            self.sources.extend([Source(
-                name=device['name'],
-                device_id=device['device_id'],
-                address_set=device['address_set'],
-                client=client,
-                mutex=mutex
-                ) for device in source_config['connections']])
-            
-        # Connect Pressure tab UI and controls
-        
-        # Connect Source tab UI and controls
+        #########################
+        # SOURCE TAB GUI CONFIG #
+        #########################
         
         ###########################
         # SHUTTER TAB GUI CONFIG  #
@@ -269,6 +285,10 @@ class MainWindow(uiclass, baseclass):
                 self.pressure_graph_widget.setXRange(max(0, new_x - time_delta), new_x)
             else:
                 self.pressure_graph_widget.setXRange(max(0, new_x - time_delta), time_delta)
+                
+    ##################
+    # SOURCE METHODS #
+    ##################
         
     ###################
     # SHUTTER METHODS #
@@ -433,6 +453,67 @@ class MainWindow(uiclass, baseclass):
     def insert_recipe_row(self, row):
         self.recipe_table.insertRow(row)
         self.add_recipe_variable_dropdown(row)
+        
+    # def on_recipe_start_button_click(self):
+    #     button = self.sender()
+    #     self.current_recipe_step = 0
+        
+    #     step_display = getattr(self, "shutter_current_step", None)
+    #     step_display.setText("0")
+    #     loop_count_display = getattr(self, "shutter_loop_count", None)
+    #     loop_count_display.setProperty("loop_count", 0)
+    #     loop_count_display.setText("0")
+        
+    #     # If loop is already running
+    #     if self.recipe_loop_step_timer.isActive():
+    #         self.shutter_loop_step_timer.stop()
+    #         self.shutter_loop_stopwatch_update_timer.stop()
+    #         self.reset_shutter_loop_timers()
+    #         button.setText("Start")
+    #         return
+        
+    #     # If loop is not running
+    #     # TODO: Disable shutter loop GUI
+    #     button.setText("Stop")
+    #     self.shutter_loop_start_time = time.monotonic()
+    #     self.shutter_loop_stopwatch_update_timer.start(100)
+    #     self._trigger_next_shutter_step()
+        
+    # def _trigger_next_recipe_step(self):
+    #     step = self.current_shutter_step
+    #     if step == 0:
+    #         loop_count_display = getattr(self, "shutter_loop_count", None)
+    #         count = loop_count_display.property("loop_count")
+    #         loop_count_display.setProperty("loop_count", count + 1)
+    #         loop_count_display.setText(f"{count + 1}")
+    #     step_display = getattr(self, "shutter_current_step", None)
+    #     step_display.setText(f"{step + 1}") # Match user-facing number, not index
+    #     self.shutter_step_start_time = time.monotonic()
+    #     logger.debug(f"Triggering shutter loop step {step}")
+    #     for i in range(len(self.shutters)):
+    #         shutter_state_widget = getattr(self, f"step_{step}_shutter_state_{i}")
+    #         if shutter_state_widget.text() == "Open":
+    #             self.shutters[i].open()
+    #         else:
+    #             self.shutters[i].close()
+            
+    #     time_input_widget = getattr(self, f"step_time_{step}", None)
+    #     if time_input_widget is None:
+    #         # TODO: Handle this error
+    #         return
+    #     state_time = int(time_input_widget.value() * 1000) # Sec to ms
+    #     logger.debug(f"State time is {state_time}")
+        
+    #     max_step_input_widget = getattr(self, "max_loop_step", None)
+    #     max_step = max_step_input_widget.value() - 1 # Indexing starts at 0, user-facing count starts at 1
+    #     if self.current_shutter_step < max_step:
+    #         self.current_shutter_step += 1
+    #     else:
+    #         self.current_shutter_step = 0
+        
+    #     if self.shutter_loop_step_timer.isActive():
+    #         self.shutter_loop_step_timer.stop()
+    #     self.shutter_loop_step_timer.start(state_time)
 
 app = QApplication(sys.argv)
 window = MainWindow()

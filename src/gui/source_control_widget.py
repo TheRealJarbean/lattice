@@ -46,7 +46,9 @@ class SourceControlWidget(QWidget):
         self.safety_button = QPushButton("Safety Rate Limit")
         
         # Change widget settings
-        for display in [self.display_temp, self.display_ramp_rate, self.display_temp]:
+        self.label.setFixedWidth(100)
+        
+        for display in [self.display_temp, self.display_ramp_rate, self.display_watts]:
             display.setReadOnly(True)
             display.setStyleSheet("""
                 QLineEdit {
@@ -84,6 +86,6 @@ if __name__ == "__main__":
     widget = SourceControlWidget()
     layout.addWidget(widget)
     window.setLayout(layout)
-    window.setWindowTitle("Custom Row Widget")
+    window.setWindowTitle("Source Control Widget")
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

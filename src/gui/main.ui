@@ -728,46 +728,7 @@ color: rgb(255, 255, 255);</string>
         <string>Sources</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_7">
-        <item row="10" column="0">
-         <widget class="SourceControlWidget" name="source_controls_9" native="true"/>
-        </item>
-        <item row="1" column="0">
-         <widget class="SourceControlWidget" name="source_controls_0" native="true">
-          <property name="styleSheet">
-           <string notr="true">background-color: rgb(0, 255, 0);</string>
-          </property>
-         </widget>
-        </item>
-        <item row="8" column="0">
-         <widget class="SourceControlWidget" name="source_controls_7" native="true">
-          <property name="styleSheet">
-           <string notr="true">background-color: rgb(255, 0, 0);</string>
-          </property>
-         </widget>
-        </item>
-        <item row="3" column="0">
-         <widget class="SourceControlWidget" name="source_controls_2" native="true"/>
-        </item>
-        <item row="4" column="0">
-         <widget class="SourceControlWidget" name="source_controls_3" native="true"/>
-        </item>
-        <item row="6" column="0">
-         <widget class="SourceControlWidget" name="source_controls_5" native="true"/>
-        </item>
-        <item row="7" column="0">
-         <widget class="SourceControlWidget" name="source_controls_6" native="true">
-          <property name="styleSheet">
-           <string notr="true">background-color: rgb(255, 85, 0);</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="0">
-         <widget class="SourceControlWidget" name="source_controls_1" native="true"/>
-        </item>
-        <item row="9" column="0">
-         <widget class="SourceControlWidget" name="source_controls_8" native="true"/>
-        </item>
-        <item row="11" column="0">
+        <item row="13" column="0">
          <widget class="PlotWidget" name="source_graph_widget" native="true">
           <property name="sizePolicy">
            <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -780,8 +741,54 @@ color: rgb(255, 255, 255);</string>
           </property>
          </widget>
         </item>
-        <item row="5" column="0">
-         <widget class="SourceControlWidget" name="source_controls_4" native="true"/>
+        <item row="1" column="0">
+         <layout class="QVBoxLayout" name="verticalLayout_2">
+          <property name="spacing">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="SourceControlWidget" name="source_controls_4" native="true"/>
+          </item>
+          <item>
+           <widget class="SourceControlWidget" name="source_controls_6" native="true">
+            <property name="styleSheet">
+             <string notr="true"/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="SourceControlWidget" name="source_controls_5" native="true"/>
+          </item>
+          <item>
+           <widget class="SourceControlWidget" name="source_controls_7" native="true">
+            <property name="styleSheet">
+             <string notr="true"/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="SourceControlWidget" name="source_controls_0" native="true">
+            <property name="styleSheet">
+             <string notr="true"/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="SourceControlWidget" name="source_controls_1" native="true"/>
+          </item>
+          <item>
+           <widget class="SourceControlWidget" name="source_controls_2" native="true"/>
+          </item>
+          <item>
+           <widget class="SourceControlWidget" name="source_controls_8" native="true"/>
+          </item>
+          <item>
+           <widget class="SourceControlWidget" name="source_controls_3" native="true"/>
+          </item>
+          <item>
+           <widget class="SourceControlWidget" name="source_controls_9" native="true"/>
+          </item>
+         </layout>
         </item>
         <item row="0" column="0">
          <layout class="QHBoxLayout" name="horizontalLayout_4">
@@ -795,7 +802,7 @@ color: rgb(255, 255, 255);</string>
             </property>
             <property name="sizeHint" stdset="0">
              <size>
-              <width>75</width>
+              <width>140</width>
               <height>20</height>
              </size>
             </property>
@@ -813,7 +820,7 @@ color: rgb(255, 255, 255);</string>
              <string notr="true"/>
             </property>
             <property name="text">
-             <string>Setpoint</string>
+             <string>New Setpoint</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignmentFlag::AlignCenter</set>
@@ -829,7 +836,7 @@ color: rgb(255, 255, 255);</string>
              </sizepolicy>
             </property>
             <property name="text">
-             <string>Ramp Rate</string>
+             <string>New Rate Limit</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignmentFlag::AlignCenter</set>
@@ -861,7 +868,7 @@ color: rgb(255, 255, 255);</string>
              </sizepolicy>
             </property>
             <property name="text">
-             <string>TextLabel</string>
+             <string>Setpoint</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignmentFlag::AlignCenter</set>
@@ -877,7 +884,7 @@ color: rgb(255, 255, 255);</string>
              </sizepolicy>
             </property>
             <property name="text">
-             <string>TextLabel</string>
+             <string>Rate Limit</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignmentFlag::AlignCenter</set>
@@ -893,7 +900,7 @@ color: rgb(255, 255, 255);</string>
              </sizepolicy>
             </property>
             <property name="text">
-             <string>TextLabel</string>
+             <string>Watts</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignmentFlag::AlignCenter</set>
@@ -3210,11 +3217,11 @@ QTableWidget::item { text-align: center; }</string>
  <resources/>
  <connections/>
  <buttongroups>
+  <buttongroup name="shutter_loop_state_buttons"/>
   <buttongroup name="shutter_control_button_group">
    <property name="exclusive">
     <bool>false</bool>
    </property>
   </buttongroup>
-  <buttongroup name="shutter_loop_state_buttons"/>
  </buttongroups>
 </ui>
