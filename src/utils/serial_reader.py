@@ -15,6 +15,7 @@ class SerialReader(QObject):
         self.read_timer.timeout.connect(self.read)
         
     def read(self):
+        self.mutex.lock()
         if not self.ser.is_open:
             logger.debug(f"Serial port {self.ser.port} is not connected, restart required")
             self.read_timer.stop()
@@ -22,7 +23,6 @@ class SerialReader(QObject):
         
         try:
             if self.ser.in_waiting:
-                self.mutex.lock()
                 try:
                     raw_data = self.ser.read(self.ser.in_waiting)
                     message = raw_data.decode('utf-8', errors='ignore').strip()
@@ -30,9 +30,9 @@ class SerialReader(QObject):
                         self.data_received.emit(message)
                 except Exception as e:
                     print(f"Serial read error: {e}")
-                    self.mutex.unlock()
         except serial.SerialException as e:
             logger.error(e)
+        self.mutex.unlock()
     
     def start(self):
         if not self.read_timer.isActive():
