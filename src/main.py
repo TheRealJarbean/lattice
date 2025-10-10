@@ -63,31 +63,66 @@ class MainWindow(uiclass, baseclass):
         self.setupUi(self)
         
         # Set application start time
-        self.start_time = time.time()
+        self.start_time = time.monotonic()
         
         ##################
         # PRESSURE SETUP #
         ##################
+        
         pressure_config = hardware_config['devices']['pressure']
+        
+        # Configure pressure serial port
         ser = serial.Serial(
             port=pressure_config['serial']['port'], 
             baudrate=pressure_config['serial']['baudrate']
             )
         mutex = QMutex()
         
+        # Create pressure gauge objects
         self.pressure_reader = SerialReader(ser, mutex)
         self.pressure_reader.start()
         self.pressure_gauges = [Pressure(
             name=gauge['name'], 
-            address=gauge['address'], 
+            address=gauge['address'],
             ser=ser, 
             mutex=mutex,
             ser_reader=self.pressure_reader
             ) for gauge in pressure_config['connections']]
         
+        # Initialize pressure data object
+        self.pressure_data = []
+        for gauge in self.pressure_gauges:
+            self.pressure_data.append([])
+        
+        # Start polling for data
+        for gauge in self.pressure_gauges:
+            gauge.start_polling()
+            
+        # Connect pressure gauge signals
+        for i, gauge in enumerate(self.pressure_gauges):
+            # Update displayed pressure
+            pressure_label = getattr(self, f"pressure_display_{i}", None)
+            gauge.pressure_changed.connect(lambda pressure, label=pressure_label: label.setText(f"{pressure:.2e}"))
+            
+            # Update rate of change
+            rate_label = getattr(self, f"pressure_rate_{i}", None)
+            gauge.rate_changed.connect(lambda rate, label=rate_label: label.setText(f"{rate:.2f}"))
+            
+            # Update stored data
+            gauge.pressure_changed.connect(
+                lambda data, idx=i: self.pressure_data[idx].append((self.time_since_start(), data))
+            )
+            
+            # Update on off button state
+            toggle_button = getattr(self, f"pressure_toggle_{i}", None)
+            gauge.is_on_changed.connect(
+                lambda is_on, b=toggle_button: b.setText("Turn off" if is_on else "Turn on")
+            )
+        
         ################
         # SOURCE SETUP #
         ################
+        
         # Sources are the only devices that have multiple physical connections
         # An empty list is created first, then each device on each different connection
         # is appended
@@ -147,6 +182,31 @@ class MainWindow(uiclass, baseclass):
         ###########################
         # PRESSURE TAB GUI CONFIG #
         ###########################
+        
+        # Connect gauge toggle buttons
+        for i, gauge in enumerate(self.pressure_gauges):
+            button = getattr(self, f"pressure_toggle_{i}", None)
+            button.clicked.connect(gauge.toggle_on_off)
+        
+        # Configure pressure data plot
+        self.pressure_graph_widget.plotItem.setAxisItems({'left': ScientificAxis('left')})
+        self.pressure_graph_widget.enableAutoRange(axis='x', enable=False)
+        self.pressure_graph_widget.enableAutoRange(axis='y', enable=False)
+        self.pressure_graph_widget.setXRange(0, 30)
+        self.pressure_graph_widget.setYRange(-1, 1) # TODO: change this
+        self.pressure_curves = [
+            self.pressure_graph_widget.plot(pen=pg.mkPen('r', width=2)),
+            self.pressure_graph_widget.plot(pen=pg.mkPen('g', width=2)),
+            self.pressure_graph_widget.plot(pen=pg.mkPen('b', width=2)),
+            self.pressure_graph_widget.plot(pen=pg.mkPen('y', width=2))
+        ]
+        for curve in self.pressure_curves:
+            curve.setClipToView(True)
+            
+        # Start timer to update pressure plot
+        self.pressure_plot_update_timer = QTimer()
+        self.pressure_plot_update_timer.timeout.connect(self.update_pressure_plot)
+        self.pressure_plot_update_timer.start(20)
         
         #########################
         # SOURCE TAB GUI CONFIG #
@@ -240,61 +300,25 @@ class MainWindow(uiclass, baseclass):
         
         # Add dropdown to default row
         self.add_recipe_variable_dropdown(0)
-        
-
-        # Pressure data and plot initialization
-        self.pressure_data = {
-            "x" : [],
-            "y" : [[], [], [], []]
-        }
-        self.pressure_graph_widget.plotItem.setAxisItems({'left': ScientificAxis('left')})
-        self.pressure_graph_widget.enableAutoRange(axis='x', enable=False)
-        self.pressure_graph_widget.enableAutoRange(axis='y', enable=False)
-        self.pressure_graph_widget.setXRange(0, 30)
-        self.pressure_graph_widget.setYRange(-1, 1) # TODO: change this
-        # TODO: Maybe add color to config and create curve for each gauge
-        self.pressure_curves = [
-            self.pressure_graph_widget.plot(pen=pg.mkPen('r', width=2)),
-            self.pressure_graph_widget.plot(pen=pg.mkPen('g', width=2)),
-            self.pressure_graph_widget.plot(pen=pg.mkPen('b', width=2)),
-            self.pressure_graph_widget.plot(pen=pg.mkPen('y', width=2))
-        ]
-        for curve in self.pressure_curves:
-            curve.setClipToView(True)
-            
-        # Set up a timer to update the plot every 5 seconds
-        self.timer = QTimer(self)
-        self.timer.setInterval(25)  # milliseconds
-        self.timer.timeout.connect(self.update_pressure_plot)
-        self.timer.start()
     
     ####################
     # Pressure Methods #
     ####################
     
+    def on_new_pressure_data(self, idx, data):
+        self.pressure_data[idx].append((time.monotonic(), data))
+    
     def update_pressure_plot(self):
-        # Simulate real-time data (you can replace this with sensor/API input)
-        current_time = time.time() - self.start_time
-        new_x = current_time
-        new_y = [np.sin(new_x), np.sin(new_x + 90), np.sin(new_x + 180), np.sin(new_x + 270)] # sin wave
-        # new_y = np.sin(current_time) + np.random.normal(scale=0.1)  # noisy sine wave
-
-        # Display most recent values
-        self.growth_display.setText(f"{new_y[0]:.2e}")
-        self.flux_display.setText(f"{new_y[1]:.2e}")
-        self.intro_display.setText(f"{new_y[2]:.2e}")
-        self.thermocouple_display.setText(f"{new_y[3]:.2e}")
-
-        # Append new data
-        self.pressure_data['x'].append(new_x)
-        for i in range(len(new_y)):
-            self.pressure_data['y'][i].append(new_y[i])
-        
         # Update the plot with new full dataset
-        for i in range(len(self.pressure_curves)):
-            self.pressure_curves[i].setData(np.array(
-                self.pressure_data['x']),
-                self.pressure_data['y'][i]
+        max_time = 0 # To scale x axis later
+        for i in range(len(self.pressure_data)):
+            if self.pressure_data[i]:
+                timestamps, values = zip(*self.pressure_data[i])
+                if timestamps[-1] > max_time:
+                    max_time = timestamps[-1]
+                self.pressure_curves[i].setData(
+                    np.array(timestamps),
+                    np.array(values)
                 )
 
         # Optional: auto-scroll x-axis
@@ -303,10 +327,10 @@ class MainWindow(uiclass, baseclass):
         time_delta = time_delta_field.value()
         if time_lock_checkbox.isChecked():
             # Show last time_delta seconds
-            if new_x >= time_delta:
-                self.pressure_graph_widget.setXRange(max(0, new_x - time_delta), new_x)
+            if max_time >= time_delta:
+                self.pressure_graph_widget.setXRange(max(0, max_time - time_delta), max_time)
             else:
-                self.pressure_graph_widget.setXRange(max(0, new_x - time_delta), time_delta)
+                self.pressure_graph_widget.setXRange(max(0, max_time - time_delta), time_delta)
                 
     ##################
     # SOURCE METHODS #
@@ -314,7 +338,7 @@ class MainWindow(uiclass, baseclass):
     
     def open_pid_input_modal(self, idx):
         pid_input_settings = ["1", "2", "3"] # TODO: Ask what these should be
-        input_modal = InputModalWidget(pid_input_settings, 'PID Settings')
+        input_modal = InputModalWidget(pid_input_settings, window_title='PID Settings')
         if input_modal.exec():
             logger.debug(f"PID Input {idx} Submitted: {input_modal.get_values()}" )
         else:
@@ -322,7 +346,7 @@ class MainWindow(uiclass, baseclass):
     
     def open_safe_rate_limit_input_modal(self, idx):
         safe_rate_limit_settings = ["From", "To", "Rate Limit"]
-        input_modal = InputModalWidget(safe_rate_limit_settings, 'Safe Rate Limit Settings')
+        input_modal = InputModalWidget(safe_rate_limit_settings, window_title='Safe Rate Limit Settings')
         if input_modal.exec():
             logger.debug(f"Safe Rate Limit Input {idx} Submitted: {input_modal.get_values()}")
         else:
@@ -569,6 +593,9 @@ class MainWindow(uiclass, baseclass):
     def write_theme_config_changes(self):
         with open(theme_config_path, "w") as f:
             yaml.dump(theme_config, f, default_flow_style=False)
+            
+    def time_since_start(self):
+        return time.monotonic() - self.start_time
 
 app = QApplication(sys.argv)
 window = MainWindow()

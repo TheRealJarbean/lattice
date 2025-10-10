@@ -19,6 +19,7 @@ class SerialReader(QObject):
         if not self.ser.is_open:
             logger.debug(f"Serial port {self.ser.port} is not connected, restart required")
             self.read_timer.stop()
+            self.mutex.unlock()
             return
         
         try:
@@ -32,7 +33,8 @@ class SerialReader(QObject):
                     print(f"Serial read error: {e}")
         except serial.SerialException as e:
             logger.error(e)
-        self.mutex.unlock()
+        finally:
+            self.mutex.unlock()
     
     def start(self):
         if not self.read_timer.isActive():

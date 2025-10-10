@@ -1,4 +1,4 @@
-from PySide6.QtCore import Signal, QMutex, QObject
+from PySide6.QtCore import Signal, QMutex, QObject, Slot, QTimer
 import time
 import serial
 import logging
@@ -28,49 +28,57 @@ class Pressure(QObject):
         self.rate_per_second = 0.0
         self.is_on = False
         
-        ser_reader.data_received.connect(self._handle_ser_message)
+        self.poll_timer = QTimer()
+        self.poll_timer.timeout.connect(self.poll)
         
-    def _handle_ser_message(self):
+        ser_reader.data_received.connect(self.handle_ser_message)
+        
+    @Slot(str)
+    def handle_ser_message(self, msg):
         # TODO: Implement response handling
-        pass
+        # TODO: Emit that gauge is on if response is received
+        logger.debug(f"Pressure gauge {self.name} received: {msg}")
         
     def send_command(self, cmd):
         """Send a message to the serial port."""
         self.mutex.lock()
-        if self.ser and self.ser.is_open:
-            try:
+        try:
+            if self.ser and self.ser.is_open:
                 # Add a newline or protocol-specific ending if needed
                 self.ser.write(f"{cmd}\r\n".encode('utf-8'))
+                time.sleep(0.01)
                 logger.debug(f"{self.port} O: {cmd}")
-            except Exception as e:
-                print(f"Error in sending serial data on port {self.port}: {e}")
-        self.mutex.unlock()
-        
-    def turn_on(self):
-        # TODO: Verify this command is correct
-        self.send_command(f'#0031{self.address}')
-        self.is_on_changed.emit(True)
-        
-    def turn_off(self):
-        # TODO: Verify this command is correct
-        self.send_command(f'##0030{self.address}')
-        self.is_on_changed.emit(False)
+        except Exception as e:
+            logger.error(f"Error in sending serial data on port {self.port}: {e}")
+        finally:
+            self.mutex.unlock()
+    
+    def toggle_on_off(self):
+        if self.is_on:
+            logger.debug(f"Turning off gauge {self.name}")
+            self.send_command(f'#0030{self.address}')
+            self.is_on = False
+            self.is_on_changed.emit(False)
+        else:
+            logger.debug(f"Turning on gauge {self.name}")
+            self.send_command(f'#0031{self.address}')
+            self.is_on = True
+            self.is_on_changed.emit(True)
 
     def update_rate(self):
         new_rate = (self.rate_per_second + self.pressures) / 2
         self.rate_per_second = new_rate
         self.rate_changed.emit(new_rate)
+    
+    def start_polling(self):
+        if not self.poll_timer.isActive():
+            self.poll_timer.start(20)
+    
+    def stop_polling(self):
+        if self.poll_timer.isActive():
+            self.poll_timer.stop()
 
-    def _poll(self):
-        # TODO: Revise this
-        # This replicates the sequence structure of LabVIEW, but shouldn't be necessary to run commands sequentially like this
-        
-        self.send_command(f'#0032{self.address}')
-        time.sleep(0.03)
+    def poll(self):
         if self.is_on:
-            self.send_command(f'#0031{self.address}')
-        else:
-            self.send_command(f'##0030{self.address}')
-        time.sleep(0.03)
-        self.send(f'#000F')
-        time.sleep(0.08)
+            self.send_command(f'#0032{self.address}')
+            # self.send(f'#000F') TODO: Find out what this does
