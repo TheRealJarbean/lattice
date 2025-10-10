@@ -23,6 +23,7 @@ class Pressure(QObject):
         self.name = name
         self.address = address
         self.ser = ser
+        self.mutex = mutex
         self.pressure = 0.0
         self.rate_per_second = 0.0
         self.is_on = False
