@@ -1,3 +1,4 @@
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog, 
     QVBoxLayout, 
@@ -33,7 +34,16 @@ class InputModalWidget(QDialog):
             label = QLabel(label_text)
             spin_box = QDoubleSpinBox()
             spin_box.setFixedWidth(100)
-            spin_box.setStyleSheet("QDoubleSpinBox::up-button, QDoubleSpinBox::down-button { width: 0; }") # Hide arrows
+            spin_box.lineEdit().setAlignment(Qt.AlignmentFlag.AlignRight)
+            spin_box.setStyleSheet("""
+                QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+                    width: 0; 
+                }
+                
+                QDoubleSpinBox {
+                    border: 1px solid #000000;
+                }
+            """) # Hide arrows and add border
             spin_box.setDecimals(2)
             spin_box.setRange(0, 10000)
             input_layout.addWidget(label, i, 0)
