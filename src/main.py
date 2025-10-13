@@ -1,7 +1,7 @@
 import sys
-from PySide6.QtWidgets import QApplication, QMenu, QHeaderView, QComboBox, QWidget
+from PySide6.QtWidgets import QApplication, QMenu, QHeaderView, QComboBox, QTableWidgetItem, QTableWidget, QPushButton
 from PySide6.QtCore import Qt, QTimer, QMutex
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QBrush, QColor
 import pyqtgraph as pg
 import numpy as np
 import time
@@ -9,6 +9,7 @@ import logging
 import os
 import yaml
 import serial
+import math
 from functools import partial
 from pymodbus.client import ModbusSerialClient
 
@@ -188,6 +189,31 @@ class MainWindow(uiclass, baseclass):
         self.shutter_step_time_elapsed_ms = 0
         self.shutter_loop_stopwatch_update_timer = QTimer()
         self.shutter_loop_stopwatch_update_timer.timeout.connect(self.update_shutter_loop_timers)
+        
+        ################
+        # RECIPE SETUP #
+        ################
+        
+        self.recipe_function_map = {
+            "SHUTTER": self.recipe_shutter_toggle,
+            "RATE_LIMIT": (lambda idx, rate_limit: self.sources[idx].set_rate_limit(float(rate_limit))),
+            "SETPOINT": (lambda idx, setpoint: self.sources[idx].set_setpoint(float(setpoint))),
+            "WAIT_UNTIL_SETPOINT": (lambda idx, setpoint: self.recipe_wait_until_setpoint(idx, float(setpoint))),
+            "WAIT_FOR_TIME_SECONDS": (lambda _, time: self.recipe_wait_for_time_seconds(int(time)))
+        }
+        
+        self.is_recipe_running = False
+        self.is_recipe_waiting = False
+        self.current_recipe_step = 0
+        
+        # WAIT_UNTIL_SETPOINT attributes
+        self.check_setpoints_timer = QTimer()
+        self.check_setpoints_timer.timeout.connect(self._recipe_check_setpoints)
+        
+        # WAIT_FOR_TIME_SECONDS attributes
+        self.recipe_wait_timer = QTimer()
+        self.recipe_wait_timer.setSingleShot(True)
+        self.recipe_wait_timer.timeout.connect(self._trigger_next_recipe_step)
 
         ###########################
         # PRESSURE TAB GUI CONFIG #
@@ -305,7 +331,7 @@ class MainWindow(uiclass, baseclass):
         #########################
         # RECIPE TAB GUI CONFIG #
         #########################
-        self.recipe_table = getattr(self, "recipe_table", None)
+        self.recipe_table: QTableWidget = getattr(self, "recipe_table", None)
         
         # Configure column resizing: first column stretches, others fixed
         self.recipe_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
@@ -326,6 +352,10 @@ class MainWindow(uiclass, baseclass):
         
         # Add dropdown to default row
         self.add_recipe_variable_dropdown(0)
+        
+        # Connect start button
+        recipe_start_button = getattr(self, "recipe_start_button", None)
+        recipe_start_button.clicked.connect(self.toggle_recipe_running)
         
         ###################
         # MISC GUI CONFIG #
@@ -612,79 +642,108 @@ class MainWindow(uiclass, baseclass):
         
     def add_recipe_variable_dropdown(self, row):
         combo = QComboBox()
-        combo.addItems([
-            "SHUTTER",
-            "RAMP_RATE",
-            "SETPOINT",
-            "WAIT_UNTIL_SETPOINT",
-            "WAIT_FOR_SECONDS",
-        ])
+        combo.addItems(self.recipe_function_map.keys())
         self.recipe_table.setCellWidget(row, 0, combo)
         
     def insert_recipe_row(self, row):
         self.recipe_table.insertRow(row)
         self.add_recipe_variable_dropdown(row)
         
-    # def on_recipe_start_button_click(self):
-    #     button = self.sender()
-    #     self.current_recipe_step = 0
+    def toggle_recipe_running(self):
+        button: QPushButton = getattr(self, "recipe_start_button", None)
+        self.current_recipe_step = 0
         
-    #     step_display = getattr(self, "shutter_current_step", None)
-    #     step_display.setText("0")
-    #     loop_count_display = getattr(self, "shutter_loop_count", None)
-    #     loop_count_display.setProperty("loop_count", 0)
-    #     loop_count_display.setText("0")
-        
-    #     # If loop is already running
-    #     if self.recipe_loop_step_timer.isActive():
-    #         self.shutter_loop_step_timer.stop()
-    #         self.shutter_loop_stopwatch_update_timer.stop()
-    #         self.reset_shutter_loop_timers()
-    #         button.setText("Start")
-    #         return
-        
-    #     # If loop is not running
-    #     # TODO: Disable shutter loop GUI
-    #     button.setText("Stop")
-    #     self.shutter_loop_start_time = time.monotonic()
-    #     self.shutter_loop_stopwatch_update_timer.start(100)
-    #     self._trigger_next_shutter_step()
-        
-    # def _trigger_next_recipe_step(self):
-    #     step = self.current_shutter_step
-    #     if step == 0:
-    #         loop_count_display = getattr(self, "shutter_loop_count", None)
-    #         count = loop_count_display.property("loop_count")
-    #         loop_count_display.setProperty("loop_count", count + 1)
-    #         loop_count_display.setText(f"{count + 1}")
-    #     step_display = getattr(self, "shutter_current_step", None)
-    #     step_display.setText(f"{step + 1}") # Match user-facing number, not index
-    #     self.shutter_step_start_time = time.monotonic()
-    #     logger.debug(f"Triggering shutter loop step {step}")
-    #     for i in range(len(self.shutters)):
-    #         shutter_state_widget = getattr(self, f"step_{step}_shutter_state_{i}")
-    #         if shutter_state_widget.text() == "Open":
-    #             self.shutters[i].open()
-    #         else:
-    #             self.shutters[i].close()
+        # If recipe is already running
+        if self.is_recipe_running:
+            self.is_recipe_running = False
+            self.is_recipe_waiting = False
             
-    #     time_input_widget = getattr(self, f"step_time_{step}", None)
-    #     if time_input_widget is None:
-    #         # TODO: Handle this error
-    #         return
-    #     state_time = int(time_input_widget.value() * 1000) # Sec to ms
-    #     logger.debug(f"State time is {state_time}")
+            # Stop timer for next step if running
+            if self.recipe_wait_timer.isActive():
+                self.recipe_wait_timer.stop()
+            
+            # Return all rows to white
+            for row in range(self.recipe_table.rowCount()):
+                self._style_row(self.recipe_table, row, "#FFFFFF")
+            
+            button.setText("Start Recipe")
+            button.setStyleSheet("""
+                background-color: rgb(0, 255, 0);
+                """) 
+            self.recipe_table.setEnabled(True)
+            return
         
-    #     max_step_input_widget = getattr(self, "max_loop_step", None)
-    #     max_step = max_step_input_widget.value() - 1 # Indexing starts at 0, user-facing count starts at 1
-    #     if self.current_shutter_step < max_step:
-    #         self.current_shutter_step += 1
-    #     else:
-    #         self.current_shutter_step = 0
+        # If recipe is not running
+        self.recipe_table.setEnabled(False)
+        button.setText("Stop Recipe")
+        button.setStyleSheet("""
+            background-color: rgb(255, 0, 0);
+            """) 
+        self.is_recipe_running = True
+        self._trigger_next_recipe_step()
         
-    #     if self.shutter_loop_step_timer.isActive():
-    #         self.shutter_loop_step_timer.stop()
-    #     self.shutter_loop_step_timer.start(state_time)
+    def _trigger_next_recipe_step(self):
+        self.is_recipe_waiting = False 
+        step = self.current_recipe_step
+        
+        if step == (self.recipe_table.rowCount()):
+            self.toggle_recipe_running()
+            return
+        
+        self._style_row(self.recipe_table, step, "#FDF586")
+        if step != 0:
+            self._style_row(self.recipe_table, step - 1, "#75FF75")
+        
+        combo_widget = self.recipe_table.cellWidget(step, 0)
+        if combo_widget is None:
+            logger.warning('No widget found in recipe column 0 row {step}, can be safely ignored on startup')
+            return
+        selection = combo_widget.currentText()
+        logger.debug(selection)
+        
+        for col in range(1, self.recipe_table.columnCount()):
+            item = self.recipe_table.item(step, col)
+            value = item.text().strip() if item else ""
+            if value:
+                try:
+                    self.recipe_function_map[selection](col - 1, value)
+                except Exception as e:
+                    logger.error(f"Error in recipe step {step}: {e}")
+        
+        self.current_recipe_step += 1
+        
+        if not self.is_recipe_waiting:
+            self._trigger_next_recipe_step()
+            
+    def recipe_shutter_toggle(self, idx, open):
+        if open == 1:
+            self.shutters[idx].open()
+        elif open == 0:
+            self.shutters[idx].close()
+          
+    def recipe_wait_until_setpoint(self, idx, setpoint):
+        self.is_recipe_waiting = True
+        self.sources[idx].set_setpoint(setpoint)
+        if not self.check_setpoints_timer.isActive():
+            self.check_setpoints_timer.start(500)
+    
+    def _recipe_check_setpoints(self):
+        if not self.is_recipe_waiting:
+            return # Ensure duplicate triggers don't occur
+        
+        for source in self.sources:
+            # TODO: Ask if rel_tol would be more appropriate
+            if not math.isclose(source.setpoint, source.process_variable, abs_tol=0.5):
+                return
+        
+        # Only reached if all source setpoints are near PV
+        self.check_setpoints_timer.stop()
+        self._trigger_next_recipe_step()
+        
+    def recipe_wait_for_time_seconds(self, time):
+        self.is_recipe_waiting = True
+        self.recipe_wait_timer.start(time * 1000)
+        
     
     ################
     # MISC METHODS #
@@ -742,8 +801,18 @@ class MainWindow(uiclass, baseclass):
         # Show the popped out tab
         tab.show()
         
+    def _style_row(self, table, row, bg_color="#FFFFFF"):
+        cols = table.columnCount()
+        for col in range(1, cols): # Ignore first column
+            item: QTableWidgetItem = table.item(row, col)
+            if item is None:
+                item = QTableWidgetItem()
+                table.setItem(row, col, item)
 
-app = QApplication(sys.argv)
+            # Set BG Color
+            item.setBackground(QBrush(QColor(bg_color)))
+        
+app = QApplication(sys.argv)# 
 window = MainWindow()
 window.show()
 app.exec()

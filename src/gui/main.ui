@@ -24,7 +24,7 @@
        </sizepolicy>
       </property>
       <property name="currentIndex">
-       <number>2</number>
+       <number>3</number>
       </property>
       <property name="tabsClosable">
        <bool>false</bool>
@@ -3075,7 +3075,22 @@ font: 50pt &quot;Segoe UI&quot;;</string>
          <widget class="QTableWidget" name="recipe_table">
           <property name="styleSheet">
            <string notr="true">QHeaderView::section { font-weight: bold; }
-QTableWidget::item { text-align: center; }</string>
+QTableWidget::item { text-align: center; }
+QTableWidget:disabled {
+    color: black;
+}
+
+QTableView::item:disabled {
+    color: black;
+}
+
+QComboBox:disabled {
+    color: black;
+}
+
+QHeaderView::section:disabled {
+    color: black;
+}</string>
           </property>
           <property name="alternatingRowColors">
            <bool>false</bool>
@@ -3175,7 +3190,7 @@ QTableWidget::item { text-align: center; }</string>
            </spacer>
           </item>
           <item>
-           <widget class="QPushButton" name="pushButton_5">
+           <widget class="QPushButton" name="recipe_start_button">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
               <horstretch>0</horstretch>
