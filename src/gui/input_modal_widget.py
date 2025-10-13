@@ -16,7 +16,7 @@ import sys
 logger = logging.getLogger(__name__)
 
 class InputModalWidget(QDialog):
-    def __init__(self, labels, defaults=None, window_title=""):
+    def __init__(self, labels, defaults: tuple | list = None, window_title=""):
         super().__init__()
         self.setWindowTitle(window_title)
         self.setModal(True) # Prevent main window interaction until closed
@@ -43,9 +43,13 @@ class InputModalWidget(QDialog):
                 QDoubleSpinBox {
                     border: 1px solid #000000;
                 }
-            """) # Hide arrows and add border
+                """) # Hide arrows and add border
             spin_box.setDecimals(2)
             spin_box.setRange(0, 10000)
+            
+            # Apply default value
+            spin_box.setValue(defaults[i])
+            
             input_layout.addWidget(label, i, 0)
             input_layout.addWidget(spin_box, i, 1)
             self.spin_boxes[label_text] = spin_box
@@ -76,7 +80,8 @@ class InputModalWidget(QDialog):
 if __name__ == "__main__":
     def open_modal():
         labels = ['First', 'Middle', 'Last']
-        input_modal = InputModalWidget(labels, 'Test Modal')
+        defaults = [1.0, 2.0, 3.0]
+        input_modal = InputModalWidget(labels, defaults, 'Test Modal')
         if input_modal.exec():
             logger.debug("Submitted:", input_modal.get_values())
         else:
