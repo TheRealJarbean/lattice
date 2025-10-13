@@ -134,9 +134,12 @@ class MainWindow(uiclass, baseclass):
         
         safety_settings = parameter_config['sources']['rate_limit_safety']
         for source_config in hardware_config['devices']['sources'].values():
+            logger.debug(source_config)
+            logger.debug(source_config['serial']['port'])
             client = ModbusSerialClient(
                 port=source_config['serial']['port'], 
-                baudrate=source_config['serial']['baudrate']
+                baudrate=source_config['serial']['baudrate'],
+                timeout=0.001
                 )
             mutex = QMutex()
             self.sources.extend([Source(
@@ -154,8 +157,9 @@ class MainWindow(uiclass, baseclass):
         num_unique_sources = 10 
             
         # Start polling for data
-        for source in self.sources:
-            source.start_polling()
+        # TODO: Move to new thread
+        # for source in self.sources:
+        #     source.start_polling()
 
         # Initialize source data object
         self.source_data = []
@@ -164,7 +168,7 @@ class MainWindow(uiclass, baseclass):
 
         # Connect source process variable changes to data handling
         for i in range(num_unique_sources):
-            self.sources[i].process_variable_changed.connect(self.on_new_source_data)
+            self.sources[i].process_variable_changed.connect(partial(self.on_new_source_data, i))
         
         #################
         # SHUTTER SETUP #
@@ -288,13 +292,13 @@ class MainWindow(uiclass, baseclass):
             
             # Connect variable displays
             self.sources[i].process_variable_changed.connect(
-                lambda pv, c=controls: c.display_temp.setText(str(pv))
+                lambda pv, c=controls: c.display_temp.setText(f"{pv:.2f} C")
                 )
             self.sources[i].setpoint_changed.connect(
-                lambda sp, c=controls: c.display_setpoint.setText(str(sp))
+                lambda sp, c=controls: c.display_setpoint.setText(f"{sp:.2f} C")
                 )
             self.sources[i].rate_limit_changed.connect(
-                lambda rate, c=controls: c.display_rate_limit.setText(str(rate))
+                lambda rate, c=controls: c.display_rate_limit.setText(f"{rate:.2f} C/s")
             )
             # TODO: Connect power display for all sources?
             # TODO: Connect extra display for power depending on mg_bulk and mg_cracker needs

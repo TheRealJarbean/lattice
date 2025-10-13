@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 MODBUS_ADDRESSES = {
     "loop_1": {
-        "setpoint": 32772,
+        "setpoint": 32816,
         "setpoint_rate_limit": 32838,
         "process_variable": 32770,
         "pid_pb": 33470,
@@ -15,9 +15,9 @@ MODBUS_ADDRESSES = {
         "pid_td": 33474
     },
     "loop_2": {
-        "setpoint": 34820,
+        "setpoint": 34864,
         "setpoint_rate_limit": 34886,
-        "process_variable": 31818,
+        "process_variable": 34818,
         "pid_pb": 35518,
         "pid_ti": 35520,
         "pid_td": 35522
@@ -89,7 +89,8 @@ class Source(QObject):
                 logger.warning(f"Modbus response was error when reading {key} from source {self.id}, {self.name}: {res}")
                 return None
             
-            return res.registers[int(1)]
+            value = self.client.convert_from_registers(res.registers, self.client.DATATYPE.FLOAT32)
+            return value
         
         except ModbusException as e:
             logger.error(f"Error reading {key} from source {self.id}, {self.name}: {e}")
@@ -102,8 +103,8 @@ class Source(QObject):
         self.mutex.lock()
         try:
             addresses = self.addresses
-            res = self.client.write_register(address=addresses[key], device_id=self.id, value=value)
-            
+            encoded_value = self.client.convert_to_registers(value, self.client.DATATYPE.FLOAT32)
+            res = self.client.write_registers(address=addresses[key], values=encoded_value, device_id=self.id)
             if res.isError():
                 logger.warning(f"Modbus response was error when writing {key} to source id {self.id}, {self.name}: {res}")
         
@@ -115,7 +116,7 @@ class Source(QObject):
         
     def start_polling(self):
         if not self.poll_timer.isActive():
-            self.poll_timer.start(50)
+            self.poll_timer.start(500)
     
     def stop_polling(self):
         if self.poll_timer.isActive():
@@ -123,8 +124,8 @@ class Source(QObject):
         
     def poll(self):
         logger.debug(f"Polling source id {self.id}, {self.name}")
-        new_process_variable = self.read_data("process_variable")
-        if new_process_variable is None:
+        new_process_variable = self.read_data("process_variable", count=2)
+        if not new_process_variable:
             return
         
         self.process_variable = new_process_variable
@@ -135,14 +136,14 @@ class Source(QObject):
             self.set_rate_limit(self.safe_rate_limit)
         
         elif self.rate_limit == self.safe_rate_limit:
-            self.rate_limit_changed(self.rate_limit)
+            self.rate_limit_changed.emit(self.rate_limit)
             self.set_rate_limit(self.rate_limit)
     
     def get_setpoint(self) -> float:
-        return self.read_data("setpoint")
+        return self.read_data("setpoint", count=2)
     
     def get_rate_limit(self) -> float:
-        return self.read_data("setpoint_rate_limit")
+        return self.read_data("setpoint_rate_limit", count=2)
     
     def get_rate_limit_safety(self) -> tuple[float, float, float]:
         """
@@ -154,9 +155,9 @@ class Source(QObject):
         """
         Returns pid_pb, pid_ti, and pid_td as tuple
         """
-        pid_pb = self.read_data("pid_pb")
-        pid_ti = self.read_data("pid_ti")
-        pid_td = self.read_data("pid_td")
+        pid_pb = self.read_data("pid_pb", count=2)
+        pid_ti = self.read_data("pid_ti", count=2)
+        pid_td = self.read_data("pid_td", count=2)
         
         # If any failed to read
         if None in (pid_pb, pid_ti, pid_td):

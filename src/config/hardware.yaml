@@ -18,7 +18,7 @@
 devices:
   pressure:
     serial:
-      port: null
+      port: COM6
       baudrate: 9600
     connections:
       - name: Growth Ion
@@ -32,57 +32,55 @@ devices:
 
   shutters:
     serial:
-      # port: COM8
-      port: null
+      port: COM8
       baudrate: 9600
     connections:
       - name: Aluminum
         address: 0
       - name: Scandium
-        address: 1
+        address: 0
       - name: none
-        address: 2
+        address: 0
       - name: Magnesium
-        address: 3
+        address: 0
       - name: Gallium
-        address: 4
+        address: 0
       - name: Indium
-        address: 5
+        address: 0
       - name: Silicon
-        address: 6
-      - name: Beryllium
         address: 7
+      - name: Beryllium
+        address: 0
 
   sources:
     effusion_cells:
       serial:
-        # port: COM10
-        port: null
+        port: COM10
         baudrate: 9600
       connections:
         - name: Gallium
-          device_id: 0
+          device_id: 1
           address_set: loop_1
         - name: Scandium
-          device_id: 0
+          device_id: 1
           address_set: loop_2
         - name: Beryllium
-          device_id: 1
+          device_id: 2
           address_set: loop_1
         - name: Aluminum
-          device_id: 1
+          device_id: 2
           address_set: loop_2
         - name: Indium
-          device_id: 2
+          device_id: 3
           address_set: loop_1
         - name: Silicon
-          device_id: 2
+          device_id: 3
           address_set: loop_2
         - name: Substrate
-          device_id: 3
+          device_id: 4
           address_set: loop_1
         - name: Intro
-          device_id: 3
+          device_id: 4
           address_set: loop_2
     
     mg_bulk_pid:

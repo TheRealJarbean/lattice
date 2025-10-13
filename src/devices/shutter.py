@@ -31,10 +31,10 @@ class Shutter(QObject):
             try:
                 # Add a newline or protocol-specific ending if needed
                 self.ser.write(f"{cmd}\r\n".encode('utf-8'))
-                time.sleep(0.01)
-                logger.debug(f"{self.port} O: {cmd}")
+                time.sleep(0.02)
+                logger.debug(f"{self.ser.port} O: {cmd}")
             except Exception as e:
-                print(f"Error in sending serial data on port {self.port}: {e}")
+                logger.error(f"Error in sending serial data on port {self.ser.port}: {e}")
         self.mutex.unlock()
 
     def reset(self):

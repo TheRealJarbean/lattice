@@ -37,7 +37,8 @@ class Pressure(QObject):
     def handle_ser_message(self, msg):
         # TODO: Implement response handling
         # TODO: Emit that gauge is on if response is received
-        logger.debug(f"Pressure gauge {self.name} received: {msg}")
+        decoded_msg = int(msg, 2).to_bytes(len(msg) // 8, 'big').decode()
+        logger.debug(f"Pressure gauge {self.name} received: {decoded_msg}")
         
     def send_command(self, cmd):
         """Send a message to the serial port."""
@@ -47,9 +48,9 @@ class Pressure(QObject):
                 # Add a newline or protocol-specific ending if needed
                 self.ser.write(f"{cmd}\r\n".encode('utf-8'))
                 time.sleep(0.01)
-                logger.debug(f"{self.port} O: {cmd}")
+                logger.debug(f"{self.ser.port} O: {cmd}")
         except Exception as e:
-            logger.error(f"Error in sending serial data on port {self.port}: {e}")
+            logger.error(f"Error in sending serial data on port {self.ser.port}: {e}")
         finally:
             self.mutex.unlock()
     
