@@ -148,10 +148,19 @@ class MainWindow(uiclass, baseclass):
                 mutex=mutex
                 ) for device in source_config['connections']])
             
+        # mg_bulk and mg_cracker have separate entries for polling power values for some reason,
+        # but they are the same physical unit
+        # This can be replaced with len(self.sources) if that is changed
+        num_unique_sources = 10 
+            
         # Start polling for data
         for source in self.sources:
-            pass
-            # source.start_polling()
+            source.start_polling()
+
+        # Initialize source data object
+        self.source_data = []
+        for _ in range(num_unique_sources):
+            self.source_data.append([])
         
         #################
         # SHUTTER SETUP #
@@ -251,11 +260,7 @@ class MainWindow(uiclass, baseclass):
         # Create the source control widgets
         self.source_controls_layout = getattr(self, "source_controls", None)
         self.source_controls: list[SourceControlWidget] = []
-        
-        # mg_bulk and mg_cracker have separate entries for polling power values for some reason,
-        # but they are the same physical unit
-        # This can be replaced with len(self.sources) if that is changed
-        num_unique_sources = 10 
+    
         colors = theme_config['source_tab']['colors']
         for i in range(num_unique_sources):
             controls = SourceControlWidget(color=f"#{colors[i]}")
@@ -288,8 +293,24 @@ class MainWindow(uiclass, baseclass):
                 lambda rate, c=controls: c.display_rate_limit.setText(str(rate))
             )
             # TODO: Connect power display for all sources?
+            # TODO: Connect extra display for power depending on mg_bulk and mg_cracker needs
             
-        # TODO: Connect extra display for power depending on mg_bulk and mg_cracker needs
+        # Configure source data plot
+        self.source_graph_widget.plotItem.setAxisItems({'left': ScientificAxis('left')})
+        self.source_graph_widget.enableAutoRange(axis='x', enable=False)
+        self.source_graph_widget.enableAutoRange(axis='y', enable=False)
+        self.source_graph_widget.setXRange(0, 30)
+        self.source_graph_widget.setYRange(-1, 1) # TODO: change this
+        self.source_curves = []
+        for _ in self.source_controls:
+            self.source_curves.append(self.source_graph_widget.plot(pen=pg.mkPen('b', width=2)))
+        for curve in self.source_curves:
+            curve.setClipToView(True)
+            
+        # Start timer to update pressure plot
+        self.source_plot_update_timer = QTimer()
+        self.source_plot_update_timer.timeout.connect(self.update_source_plot)
+        self.source_plot_update_timer.start(20)
         
         ###########################
         # SHUTTER TAB GUI CONFIG  #
@@ -403,6 +424,9 @@ class MainWindow(uiclass, baseclass):
     ##################
     # SOURCE METHODS #
     ##################
+
+    def on_new_source_data(self, idx, data):
+        self.source_data[idx].append((time.monotonic(), data))
     
     def on_source_set_clicked(self, idx):
         setpoint = self.source_controls[idx].input_setpoint.value()
@@ -490,6 +514,30 @@ class MainWindow(uiclass, baseclass):
         # Save color change to config file
         theme_config['source_tab']['colors'][idx] = color[1:] # Remove leading '#'
         self.write_theme_config_changes()
+
+    def update_source_plot(self):
+        # Update the plot with new full dataset
+        max_time = 0 # To scale x axis later
+        for i in range(len(self.source_data)):
+            if self.source_data[i]:
+                timestamps, values = zip(*self.source_data[i])
+                if timestamps[-1] > max_time:
+                    max_time = timestamps[-1]
+                self.source_curves[i].setData(
+                    np.array(timestamps),
+                    np.array(values)
+                )
+
+        # Optional: auto-scroll x-axis
+        time_lock_checkbox = getattr(self, "source_plot_time_lock", None)
+        time_delta_field = getattr(self, "source_plot_time_delta", None)
+        time_delta = time_delta_field.value()
+        if time_lock_checkbox.isChecked():
+            # Show last time_delta seconds
+            if max_time >= time_delta:
+                self.pressure_graph_widget.setXRange(max(0, max_time - time_delta), max_time)
+            else:
+                self.pressure_graph_widget.setXRange(max(0, max_time - time_delta), time_delta)
         
     ###################
     # SHUTTER METHODS #
