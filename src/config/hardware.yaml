@@ -11,6 +11,9 @@
 #     - name: Ga
 #     - name: Al
 #     - name: Be
+#
+# Most device settings in other locations are keyed by the names here, so name changes
+# can result in configs being lost, be sure to back up configs before changing hardware settings
 
 devices:
   pressure:

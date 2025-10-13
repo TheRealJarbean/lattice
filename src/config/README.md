@@ -1,0 +1,1 @@
+Each config file is updated automatically in-software except for hardware.yaml. Don't edit any config files manually unless you know what you are doing.

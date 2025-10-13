@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 base_dir = os.path.dirname(os.path.abspath(__file__))
 hardware_config_path = os.path.join(base_dir, 'config', 'hardware.yaml')
 theme_config_path = os.path.join(base_dir, 'config', 'theme.yaml')
+parameter_config_path = os.path.join(base_dir, 'config', 'parameters.yaml')
 main_ui_path = os.path.join(base_dir, 'gui', 'main.ui')
 
 # Load config files
@@ -48,6 +49,9 @@ with open(hardware_config_path, 'r') as f:
     
 with open(theme_config_path, 'r') as f:
     theme_config = yaml.safe_load(f)
+    
+with open(parameter_config_path, 'r') as f:
+    parameter_config = yaml.safe_load(f)
 
 uiclass, baseclass = pg.Qt.loadUiType(main_ui_path)
 
@@ -125,8 +129,9 @@ class MainWindow(uiclass, baseclass):
         # Sources are the only devices that have multiple physical connections
         # An empty list is created first, then each device on each different connection
         # is appended
-        self.sources = []
+        self.sources: list[Source] = []
         
+        safety_settings = parameter_config['sources']['rate_limit_safety']
         for source_config in hardware_config['devices']['sources'].values():
             client = ModbusSerialClient(
                 port=source_config['serial']['port'], 
@@ -137,9 +142,15 @@ class MainWindow(uiclass, baseclass):
                 name=device['name'],
                 device_id=device['device_id'],
                 address_set=device['address_set'],
+                safety_settings=safety_settings.get(device['name'], {}),
                 client=client,
                 mutex=mutex
                 ) for device in source_config['connections']])
+            
+        # Start polling for data
+        for source in self.sources:
+            pass
+            # source.start_polling()
         
         #################
         # SHUTTER SETUP #
@@ -211,32 +222,48 @@ class MainWindow(uiclass, baseclass):
         # SOURCE TAB GUI CONFIG #
         #########################
         
+        # Create the source control widgets
         self.source_controls_layout = getattr(self, "source_controls", None)
-        self.source_controls = []
-        # mg_bulk and mg_cracker have separate entries for polling power values for some reason
+        self.source_controls: list[SourceControlWidget] = []
+        
+        # mg_bulk and mg_cracker have separate entries for polling power values for some reason,
+        # but they are the same physical unit
         # This can be replaced with len(self.sources) if that is changed
         num_unique_sources = 10 
-        
-        # Create the source control widgets
         colors = theme_config['source_tab']['colors']
         for i in range(num_unique_sources):
             controls = SourceControlWidget(color=f"#{colors[i]}")
             self.source_controls.append(controls)
             self.source_controls_layout.addWidget(controls)
-
-        # Set source name labels
+        
+        # Apply per-control widget config and connections
         for i, controls in enumerate(self.source_controls):
+            # Set source name labels
             controls.label.setText(self.sources[i].name)
             
-        # Connect color change methods
-        for i, controls in enumerate(self.source_controls):
+            # Connect color change methods
             controls.circle.color_changed.connect(partial(self.on_source_color_change, i))
             
-        # Assign modals to PID and Safe Rate Limit buttons
-        for i, controls in enumerate(self.source_controls):
+            # Assign modals to PID and Safe Rate Limit buttons
             controls.pid_button.clicked.connect(partial(self.open_pid_input_modal, i))
             controls.safety_button.clicked.connect(partial(self.open_safe_rate_limit_input_modal, i))
+
+            # Connect set buttons
+            controls.set_button.clicked.connect(partial(self.on_source_set_clicked, i))
             
+            # Connect variable displays
+            self.sources[i].process_variable_changed.connect(
+                lambda pv, c=controls: c.display_temp.setText(str(pv))
+                )
+            self.sources[i].setpoint_changed.connect(
+                lambda sp, c=controls: c.display_setpoint.setText(str(sp))
+                )
+            self.sources[i].rate_limit_changed.connect(
+                lambda rate, c=controls: c.display_rate_limit.setText(str(rate))
+            )
+            # TODO: Connect power display for all sources?
+            
+        # TODO: Connect extra display for power depending on mg_bulk and mg_cracker needs
         
         ###########################
         # SHUTTER TAB GUI CONFIG  #
@@ -347,19 +374,81 @@ class MainWindow(uiclass, baseclass):
     # SOURCE METHODS #
     ##################
     
+    def on_source_set_clicked(self, idx):
+        setpoint = self.source_controls[idx].input_setpoint.value()
+        rate_limit = self.source_controls[idx].input_rate_limit.value()
+        
+        self.sources[idx].set_setpoint(setpoint)
+        self.sources[idx].set_rate_limit(rate_limit)
+    
     def open_pid_input_modal(self, idx):
-        pid_input_settings = ["1", "2", "3"] # TODO: Ask what these should be
-        input_modal = InputModalWidget(pid_input_settings, window_title='PID Settings')
+        source = self.sources[idx]
+        pid_input_settings = ["PB", "TI", "TD"] # TODO: Ask what these should be
+        current_values = source.get_pid()
+        input_modal = InputModalWidget(
+            pid_input_settings, 
+            defaults=current_values, 
+            window_title='PID Settings'
+            )
+            
+        # On submission
         if input_modal.exec():
-            logger.debug(f"PID Input {idx} Submitted: {input_modal.get_values()}" )
+            values = input_modal.get_values()
+            logger.debug(f"PID Input {idx} Submitted: {values}")
+            pid_pb = values["PB"]
+            pid_ti = values["TI"]
+            pid_td = values["TD"]
+            
+            # Apply changes to source
+            source.set_pid(
+                pid_pb=pid_pb,
+                pid_ti=pid_ti,
+                pid_td=pid_td
+                )
+            
+        # On cancellation
         else:
             logger.debug(f"PID Input {idx} Cancelled")
     
     def open_safe_rate_limit_input_modal(self, idx):
+        source = self.sources[idx]
+        logger.debug(idx)
         safe_rate_limit_settings = ["From", "To", "Rate Limit"]
-        input_modal = InputModalWidget(safe_rate_limit_settings, window_title='Safe Rate Limit Settings')
+        current_values = source.get_rate_limit_safety()
+        input_modal = InputModalWidget(
+            safe_rate_limit_settings,
+            defaults=current_values,
+            window_title='Safe Rate Limit Settings'
+            )
+        
+        # On submission
         if input_modal.exec():
-            logger.debug(f"Safe Rate Limit Input {idx} Submitted: {input_modal.get_values()}")
+            values = input_modal.get_values()
+            logger.debug(f"Safe Rate Limit Input {idx} Submitted: {values}")
+            safe_rate_limit = values["Rate Limit"]
+            safe_from = values["From"]
+            safe_to = values["To"]
+            
+            # Apply changes to source
+            source.set_rate_limit_safety(
+                safe_rate_limit=safe_rate_limit,
+                safe_rate_limit_from=safe_from,
+                safe_rate_limit_to=safe_to
+                )
+            
+            # Save changes to config since safety settings are not stored on-device
+            # Ensure source entry exists
+            logger.debug(parameter_config)
+            if source.name not in parameter_config['sources']['rate_limit_safety']:
+                parameter_config['sources']['rate_limit_safety'][source.name] = {}
+                
+            config = parameter_config['sources']['rate_limit_safety'][source.name]
+            config["from"] = safe_from
+            config["to"] = safe_to
+            config["rate_limit"] = safe_rate_limit
+            self.write_parameter_config_changes()
+        
+        # On cancellation
         else:
             logger.debug(f"Safe Rate Limit Input {idx} Cancelled")
             
@@ -600,6 +689,10 @@ class MainWindow(uiclass, baseclass):
     ################
     # MISC METHODS #
     ################
+    
+    def write_parameter_config_changes(self):
+        with open(parameter_config_path, 'w') as f:
+            yaml.dump(parameter_config, f, default_flow_style=False)
     
     def write_theme_config_changes(self):
         with open(theme_config_path, "w") as f:

@@ -1,7 +1,15 @@
 import sys
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QWidget, QLabel, QLineEdit, QPushButton,
-    QColorDialog, QHBoxLayout, QApplication
+    QWidget, 
+    QLabel, 
+    QLineEdit, 
+    QPushButton,
+    QColorDialog, 
+    QHBoxLayout, 
+    QApplication,
+    QDoubleSpinBox,
+    QSizePolicy
 )
 from PySide6.QtGui import QColor, QPainter, QBrush
 from PySide6.QtCore import Qt, Signal
@@ -39,20 +47,36 @@ class SourceControlWidget(QWidget):
         # Create widgets
         self.label = QLabel("Label:")
         self.circle = ColorCircle(color)
-        self.input_setpoint = QLineEdit()
-        self.input_ramp_rate = QLineEdit()
+        self.input_setpoint = QDoubleSpinBox()
+        self.input_rate_limit = QDoubleSpinBox()
         self.set_button = QPushButton("Set")
         self.display_temp = QLineEdit()
-        self.display_ramp_rate = QLineEdit()
-        self.display_watts = QLineEdit()
+        self.display_setpoint = QLineEdit()
+        self.display_rate_limit = QLineEdit()
         self.pid_button = QPushButton("PID")
         self.safety_button = QPushButton("Safety Rate Limit")
         
         # Change widget settings
         self.label.setFixedWidth(100)
         
-        for display in [self.display_temp, self.display_ramp_rate, self.display_watts]:
+        for spin_box in [self.input_setpoint, self.input_rate_limit]:
+            spin_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+            spin_box.lineEdit().setAlignment(Qt.AlignmentFlag.AlignRight)
+            spin_box.setStyleSheet("""
+                QDoubleSpinBox::up-button, QDoubleSpinBox::down-button { 
+                    width: 0; 
+                }
+                
+                QDoubleSpinBox {
+                    border: 1px solid #000000;
+                }
+            """) # Remove arrows and add border
+            spin_box.setDecimals(2)
+            spin_box.setRange(0, 10000)
+        
+        for display in [self.display_temp, self.display_setpoint, self.display_rate_limit]:
             display.setReadOnly(True)
+            display.setAlignment(Qt.AlignmentFlag.AlignRight)
             display.setStyleSheet("""
                 QLineEdit {
                     background-color: #e0e0e0;
@@ -67,12 +91,12 @@ class SourceControlWidget(QWidget):
         # Add widgets to layout
         layout.addWidget(self.label)
         layout.addWidget(self.circle)
-        layout.addWidget(self.input_setpoint)
-        layout.addWidget(self.input_ramp_rate)
+        layout.addWidget(self.input_setpoint, stretch=1)
+        layout.addWidget(self.input_rate_limit, stretch=1)
         layout.addWidget(self.set_button)
-        layout.addWidget(self.display_temp)
-        layout.addWidget(self.display_ramp_rate)
-        layout.addWidget(self.display_watts)
+        layout.addWidget(self.display_temp, stretch=1)
+        layout.addWidget(self.display_setpoint, stretch=1)
+        layout.addWidget(self.display_rate_limit, stretch=1)
         layout.addWidget(self.pid_button)
         layout.addWidget(self.safety_button)
 
@@ -84,6 +108,9 @@ if __name__ == "__main__":
     window = QWidget()
     layout = QHBoxLayout()
     widget = SourceControlWidget()
+    widget.display_temp.setText("200.00 C")
+    widget.display_setpoint.setText("300.00 C")
+    widget.display_rate_limit.setText("10.00 C/s")
     layout.addWidget(widget)
     window.setLayout(layout)
     window.setWindowTitle("Source Control Widget")

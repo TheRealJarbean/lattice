@@ -24,7 +24,7 @@
        </sizepolicy>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <property name="tabsClosable">
        <bool>false</bool>
@@ -944,7 +944,7 @@ color: rgb(255, 255, 255);</string>
              </sizepolicy>
             </property>
             <property name="text">
-             <string>Setpoint</string>
+             <string>Process Variable</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignmentFlag::AlignCenter</set>
@@ -960,7 +960,7 @@ color: rgb(255, 255, 255);</string>
              </sizepolicy>
             </property>
             <property name="text">
-             <string>Rate Limit</string>
+             <string>Setpoint</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignmentFlag::AlignCenter</set>
@@ -976,7 +976,7 @@ color: rgb(255, 255, 255);</string>
              </sizepolicy>
             </property>
             <property name="text">
-             <string>Watts</string>
+             <string>Rate Limit</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignmentFlag::AlignCenter</set>
@@ -3326,11 +3326,11 @@ QTableWidget::item { text-align: center; }</string>
  <resources/>
  <connections/>
  <buttongroups>
-  <buttongroup name="shutter_loop_state_buttons"/>
   <buttongroup name="shutter_control_button_group">
    <property name="exclusive">
     <bool>false</bool>
    </property>
   </buttongroup>
+  <buttongroup name="shutter_loop_state_buttons"/>
  </buttongroups>
 </ui>
