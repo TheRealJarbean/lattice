@@ -161,6 +161,10 @@ class MainWindow(uiclass, baseclass):
         self.source_data = []
         for _ in range(num_unique_sources):
             self.source_data.append([])
+
+        # Connect source process variable changes to data handling
+        for i in range(num_unique_sources):
+            self.sources[i].process_variable_changed.connect(self.on_new_source_data)
         
         #################
         # SHUTTER SETUP #
