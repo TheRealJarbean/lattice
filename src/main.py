@@ -11,7 +11,6 @@ import yaml
 import serial
 from functools import partial
 from pymodbus.client import ModbusSerialClient
-from math import isclose
 
 # Local imports
 from devices.shutter import Shutter
@@ -20,7 +19,6 @@ from devices.pressure import Pressure
 from utils.serial_reader import SerialReader
 from gui.input_modal_widget import InputModalWidget
 from gui.source_control_widget import SourceControlWidget
-from gui.popout_tab_window import PopoutTabWindow
 
 # Set the log level based on env variable when program is run
 # Determines which logging statements are printed to console
