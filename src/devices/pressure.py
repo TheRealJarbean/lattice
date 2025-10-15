@@ -1,4 +1,4 @@
-from PySide6.QtCore import Signal, QMutex, QObject, Slot, QTimer
+from PySide6.QtCore import Signal, QMutex, QMutexLocker, QObject, Slot, QTimer
 import time
 import serial
 import logging
@@ -18,15 +18,17 @@ class Pressure(QObject):
     rate_changed = Signal(float)
     is_on_changed = Signal(bool)
 
-    def __init__(self, name, address, ser: serial.Serial, mutex: QMutex, ser_reader: SerialReader):
+    def __init__(self, name, address, ser: serial.Serial, ser_reader: SerialReader, serial_mutex: QMutex):
         super().__init__()
         self.name = name
         self.address = address
         self.ser = ser
-        self.mutex = mutex
         self.pressure = 0.0
         self.rate_per_second = 0.0
         self.is_on = False
+        
+        self.serial_mutex = serial_mutex
+        self.data_mutex = QMutex()
         
         self.poll_timer = QTimer()
         self.poll_timer.timeout.connect(self.poll)
@@ -37,12 +39,13 @@ class Pressure(QObject):
     def handle_ser_message(self, msg):
         # TODO: Implement response handling
         # TODO: Emit that gauge is on if response is received
-        decoded_msg = int(msg, 2).to_bytes(len(msg) // 8, 'big').decode()
-        logger.debug(f"Pressure gauge {self.name} received: {decoded_msg}")
+        with QMutexLocker(self.data_mutex):
+            decoded_msg = int(msg, 2).to_bytes(len(msg) // 8, 'big').decode()
+            logger.debug(f"Pressure gauge {self.name} received: {decoded_msg}")
         
     def send_command(self, cmd):
         """Send a message to the serial port."""
-        self.mutex.lock()
+        self.serial_mutex.lock()
         try:
             if self.ser and self.ser.is_open:
                 # Add a newline or protocol-specific ending if needed
@@ -52,32 +55,36 @@ class Pressure(QObject):
         except Exception as e:
             logger.error(f"Error in sending serial data on port {self.ser.port}: {e}")
         finally:
-            self.mutex.unlock()
+            self.serial_mutex.unlock()
     
     def toggle_on_off(self):
-        if self.is_on:
-            logger.debug(f"Turning off gauge {self.name}")
-            self.send_command(f'#0030{self.address}')
-            self.is_on = False
-            self.is_on_changed.emit(False)
-        else:
-            logger.debug(f"Turning on gauge {self.name}")
-            self.send_command(f'#0031{self.address}')
-            self.is_on = True
-            self.is_on_changed.emit(True)
+        with QMutexLocker(self.data_mutex):
+            if self.is_on:
+                logger.debug(f"Turning off gauge {self.name}")
+                self.send_command(f'#0030{self.address}')
+                self.is_on = False
+                self.is_on_changed.emit(False)
+            else:
+                logger.debug(f"Turning on gauge {self.name}")
+                self.send_command(f'#0031{self.address}')
+                self.is_on = True
+                self.is_on_changed.emit(True)
 
     def update_rate(self):
-        new_rate = (self.rate_per_second + self.pressures) / 2
-        self.rate_per_second = new_rate
-        self.rate_changed.emit(new_rate)
+        with QMutexLocker(self.data_mutex):
+            new_rate = (self.rate_per_second + self.pressures) / 2
+            self.rate_per_second = new_rate
+            self.rate_changed.emit(new_rate)
     
     def start_polling(self):
-        if not self.poll_timer.isActive():
-            self.poll_timer.start(20)
+        with QMutexLocker(self.data_mutex):
+            if not self.poll_timer.isActive():
+                self.poll_timer.start(20)
     
     def stop_polling(self):
-        if self.poll_timer.isActive():
-            self.poll_timer.stop()
+        with QMutexLocker(self.data_mutex):
+            if self.poll_timer.isActive():
+                self.poll_timer.stop()
 
     def poll(self):
         if self.is_on:

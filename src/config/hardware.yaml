@@ -18,7 +18,7 @@
 devices:
   pressure:
     serial:
-      port: COM6
+      port: null
       baudrate: 9600
     connections:
       - name: Growth Ion
@@ -32,7 +32,7 @@ devices:
 
   shutters:
     serial:
-      port: COM8
+      port: null
       baudrate: 9600
     connections:
       - name: Aluminum
@@ -55,7 +55,7 @@ devices:
   sources:
     effusion_cells:
       serial:
-        port: COM10
+        port: none
         baudrate: 9600
       connections:
         - name: Gallium

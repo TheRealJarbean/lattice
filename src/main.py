@@ -1,6 +1,6 @@
 import sys
 from PySide6.QtWidgets import QApplication, QMenu, QHeaderView, QComboBox, QTableWidgetItem, QTableWidget, QPushButton
-from PySide6.QtCore import Qt, QTimer, QMutex
+from PySide6.QtCore import Qt, QTimer, QMutex, QThread
 from PySide6.QtGui import QAction, QBrush, QColor
 import pyqtgraph as pg
 import numpy as np
@@ -89,8 +89,8 @@ class MainWindow(uiclass, baseclass):
             name=gauge['name'], 
             address=gauge['address'],
             ser=ser, 
-            mutex=mutex,
-            ser_reader=self.pressure_reader
+            ser_reader=self.pressure_reader,
+            serial_mutex=mutex
             ) for gauge in pressure_config['connections']]
         
         # Initialize pressure data object
@@ -148,7 +148,7 @@ class MainWindow(uiclass, baseclass):
                 address_set=device['address_set'],
                 safety_settings=safety_settings.get(device['name'], {}),
                 client=client,
-                mutex=mutex
+                serial_mutex=mutex
                 ) for device in source_config['connections']])
             
         # mg_bulk and mg_cracker have separate entries for polling power values for some reason,
@@ -157,9 +157,8 @@ class MainWindow(uiclass, baseclass):
         num_unique_sources = 10 
             
         # Start polling for data
-        # TODO: Move to new thread
-        # for source in self.sources:
-        #     source.start_polling()
+        for source in self.sources:
+            source.start_polling()
 
         # Initialize source data object
         self.source_data = []
@@ -278,7 +277,7 @@ class MainWindow(uiclass, baseclass):
         # Apply per-control widget config and connections
         for i, controls in enumerate(self.source_controls):
             # Set source name labels
-            controls.label.setText(self.sources[i].name)
+            controls.label.setText(self.sources[i].get_name())
             
             # Connect color change methods
             controls.circle.color_changed.connect(partial(self.on_source_color_change, i))
@@ -369,7 +368,7 @@ class MainWindow(uiclass, baseclass):
             self.recipe_table.setColumnWidth(col, 100)
             
         # Label columns with source names
-        column_names = ["Variable"] + [source.name for source in self.sources]
+        column_names = ["Variable"] + [source.get_name() for source in self.sources]
         self.recipe_table.setHorizontalHeaderLabels(column_names)
             
         # Center content when editing
@@ -397,6 +396,25 @@ class MainWindow(uiclass, baseclass):
         
         # Store any popout windows
         self.popouts = getattr(self, "popouts", {})
+        
+        #################
+        # START THREADS #
+        #################
+        
+        self.pressure_thread = QThread()
+        for gauge in self.pressure_gauges:
+            gauge.moveToThread(self.pressure_thread)
+        self.pressure_thread.start()
+        
+        self.source_thread = QThread()
+        for source in self.sources:
+            source.moveToThread(self.source_thread)
+        self.source_thread.start()
+        
+        self.shutter_thread = QThread()
+        for shutter in self.shutters:
+            shutter.moveToThread(self.shutter_thread)
+        self.shutter_thread.start()
     
     ####################
     # Pressure Methods #
@@ -788,8 +806,7 @@ class MainWindow(uiclass, baseclass):
             return # Ensure duplicate triggers don't occur
         
         for source in self.sources:
-            # TODO: Ask if rel_tol would be more appropriate
-            if not math.isclose(source.setpoint, source.process_variable, abs_tol=0.5):
+            if not source.is_pv_close_to_sp():
                 return
         
         # Only reached if all source setpoints are near PV
