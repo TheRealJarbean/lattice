@@ -99,8 +99,8 @@ class MainWindow(uiclass, baseclass):
             self.pressure_data.append([])
         
         # Start polling for data
-        for gauge in self.pressure_gauges:
-            gauge.start_polling()
+        # for gauge in self.pressure_gauges:
+        #     gauge.start_polling()
             
         # Connect pressure gauge signals
         for i, gauge in enumerate(self.pressure_gauges):
@@ -157,8 +157,8 @@ class MainWindow(uiclass, baseclass):
         num_unique_sources = 10 
             
         # Start polling for data
-        for source in self.sources:
-            source.start_polling()
+        # for source in self.sources:
+        #     source.start_polling()
 
         # Initialize source data object
         self.source_data = []
@@ -230,6 +230,9 @@ class MainWindow(uiclass, baseclass):
         self.recipe_wait_timer = QTimer()
         self.recipe_wait_timer.setSingleShot(True)
         self.recipe_wait_timer.timeout.connect(self._trigger_next_recipe_step)
+        
+        # Copied rows data attribute
+        self.copied_rows_data = None
 
         ###########################
         # PRESSURE TAB GUI CONFIG #
@@ -696,6 +699,8 @@ class MainWindow(uiclass, baseclass):
         if row == -1:
             return # No row under the cursor
         
+        selected_rows = set(idx.row() for idx in self.recipe_table.selectedIndexes())
+        
         # Create context menu
         menu = QMenu(self)
         
@@ -712,9 +717,21 @@ class MainWindow(uiclass, baseclass):
         # Delete row action
         # Don't let user delete only row
         if self.recipe_table.rowCount() != 1:
-            delete_row = QAction("Delete step", self)
-            delete_row.triggered.connect(lambda: self.recipe_table.removeRow(row))
-            menu.addAction(delete_row)
+            delete_rows = QAction("Delete step(s)", self)
+            delete_rows.triggered.connect(lambda: self.recipe_remove_rows(selected_rows))
+            menu.addAction(delete_rows)
+            
+        # Copy rows action
+        if selected_rows:
+            copy_rows = QAction("Copy step(s)", self)
+            copy_rows.triggered.connect(lambda: self.recipe_copy_selected_rows(selected_rows))
+            menu.addAction(copy_rows)
+        
+        # Paste rows action
+        if self.copied_rows_data:
+            paste_rows = QAction("Paste step(s)", self)
+            paste_rows.triggered.connect(lambda: self.recipe_paste_rows(row + 1))
+            menu.addAction(paste_rows)
         
         # Show menu at global position
         menu.exec(self.recipe_table.viewport().mapToGlobal(point))
@@ -727,6 +744,11 @@ class MainWindow(uiclass, baseclass):
     def insert_recipe_row(self, row):
         self.recipe_table.insertRow(row)
         self.add_recipe_variable_dropdown(row)
+        
+    def recipe_remove_rows(self, selected_rows):
+        # Start with higher indexes so lower indexes don't change
+        for row in sorted(selected_rows, reverse=True): 
+            self.recipe_table.removeRow(row)
         
     def toggle_recipe_running(self):
         button: QPushButton = getattr(self, "recipe_start_button", None)
@@ -822,6 +844,50 @@ class MainWindow(uiclass, baseclass):
         self.is_recipe_waiting = True
         self.recipe_wait_timer.start(time * 1000)
         
+    def recipe_copy_selected_rows(self, selected_rows):
+        self.copied_rows_data = []
+        for i, row in enumerate(selected_rows):
+            self.copied_rows_data.append([])
+            for col in range(self.recipe_table.columnCount()):
+                widget = self.recipe_table.cellWidget(row, col)
+                if widget:
+                    self.copied_rows_data[i].append(widget)
+                    continue
+                
+                item = self.recipe_table.item(row, col)
+                text = item.text() if item else None
+                self.copied_rows_data[i].append(text)
+    
+    def recipe_paste_rows(self, start_row):
+        logger.debug("Pasting rows")
+        logger.debug(self.copied_rows_data)
+        if not self.copied_rows_data:
+            return
+        
+        for i in range(len(self.copied_rows_data)):
+            self.recipe_table.insertRow(start_row + i)
+            for col, item in enumerate(self.copied_rows_data[i]):
+                if not item:
+                    continue
+                
+                if isinstance(item, (str, int, float)):
+                    self.recipe_table.setItem(start_row + i, col, QTableWidgetItem(item))
+                    continue
+                
+                if isinstance(item, QComboBox):
+                    new_widget = QComboBox()
+                    # Copy items
+                    for j in range(item.count()):
+                        new_widget.addItem(item.itemText(j))
+                    new_widget.setCurrentIndex(item.currentIndex())
+                
+                if not new_widget:
+                    logger.error("Something went wrong when copying rows")
+                    for j in reversed(range(i)):
+                        self.recipe_table.removeRow(start_row + j)
+                    return
+                
+                self.recipe_table.setCellWidget(start_row + i, col, new_widget)
     
     ################
     # MISC METHODS #

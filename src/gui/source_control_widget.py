@@ -75,7 +75,7 @@ class SourceControlWidget(QWidget):
         self.label.setFixedWidth(100)
         
         font = QFont()
-        font.setPointSize(14)
+        font.setPointSize(12)
         font.setBold(True)
         
         for spin_box in input_widgets:

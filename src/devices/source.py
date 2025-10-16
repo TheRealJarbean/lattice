@@ -121,7 +121,6 @@ class Source(QObject):
         
     def poll(self):
         with QMutexLocker(self.data_mutex):
-            logger.debug(f"Polling source id {self.id}, {self.name}")
             new_process_variable = self.read_data("process_variable", count=2)
             if not new_process_variable:
                 return
