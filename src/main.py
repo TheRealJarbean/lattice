@@ -597,11 +597,19 @@ class MainWindow(uiclass, baseclass):
             self.shutter_loop_stopwatch_update_timer.stop()
             self.reset_shutter_loop_timers()
             button.setText("Start")
+            button.setStyleSheet("""
+                font: 48pt "Segoe UI";
+                background-color: rgb(0, 255, 0);
+                """)
             return
         
         # If loop is not running
         # TODO: Disable shutter loop GUI
         button.setText("Stop")
+        button.setStyleSheet("""
+            font: 48pt "Segoe UI";
+            background-color: rgb(255, 0, 0);
+            """)
         self.shutter_loop_start_time = time.monotonic()
         self.shutter_loop_stopwatch_update_timer.start(100)
         self._trigger_next_shutter_step()
