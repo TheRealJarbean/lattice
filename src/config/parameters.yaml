@@ -1,2 +1,6 @@
 sources:
-  rate_limit_safety: {}
+  rate_limit_safety:
+    Gallium:
+      from: 0.0
+      rate_limit: 0.0
+      to: 0.0

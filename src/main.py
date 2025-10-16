@@ -495,12 +495,13 @@ class MainWindow(uiclass, baseclass):
     def open_safe_rate_limit_input_modal(self, idx):
         source = self.sources[idx]
         logger.debug(idx)
-        safe_rate_limit_settings = ["From", "To", "Rate Limit"]
-        current_values = source.get_rate_limit_safety()
+        safe_rate_limit_settings = ["From", "To", "Rate Limit", "Max PV"]
+        current_values = list(source.get_rate_limit_safety())
+        current_values.append(source.get_max_process_variable())
         input_modal = InputModalWidget(
             safe_rate_limit_settings,
             defaults=current_values,
-            window_title='Safe Rate Limit Settings'
+            window_title='Safety Settings'
             )
         
         # On submission
@@ -510,6 +511,7 @@ class MainWindow(uiclass, baseclass):
             safe_rate_limit = values["Rate Limit"]
             safe_from = values["From"]
             safe_to = values["To"]
+            max_pv = values["Max PV"]
             
             # Apply changes to source
             source.set_rate_limit_safety(
@@ -517,6 +519,7 @@ class MainWindow(uiclass, baseclass):
                 safe_rate_limit_from=safe_from,
                 safe_rate_limit_to=safe_to
                 )
+            source.set_max_process_variable(max_pv)
             
             # Save changes to config since safety settings are not stored on-device
             # Ensure source entry exists

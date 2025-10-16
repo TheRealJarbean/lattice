@@ -174,6 +174,10 @@ class Source(QObject):
             
             return (pid_pb, pid_ti, pid_td)
         
+    def get_max_process_variable(self):
+        with QMutexLocker(self.data_mutex):
+            # TODO: Add real read here
+            return 0   
 
     def set_setpoint(self, setpoint):
         with QMutexLocker(self.data_mutex):
@@ -212,6 +216,11 @@ class Source(QObject):
             self.write_data("pid_pb", pid_pb)
             self.write_data("pid_ti", pid_ti)
             self.write_data("pid_td", pid_td)
+            
+    def set_max_process_variable(self, value):
+        with QMutexLocker(self.data_mutex):
+            # TODO: Add actual write here
+            pass
             
     def is_pv_close_to_sp(self):
         with QMutexLocker(self.data_mutex):
