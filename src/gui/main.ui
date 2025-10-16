@@ -24,7 +24,7 @@
        </sizepolicy>
       </property>
       <property name="currentIndex">
-       <number>1</number>
+       <number>3</number>
       </property>
       <property name="tabsClosable">
        <bool>false</bool>
@@ -3182,6 +3182,13 @@ font: 50pt &quot;Segoe UI&quot;;</string>
              </size>
             </property>
            </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="add_recipe_step">
+            <property name="text">
+             <string>Add Step</string>
+            </property>
+           </widget>
           </item>
          </layout>
         </item>

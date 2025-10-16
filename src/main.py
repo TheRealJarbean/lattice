@@ -211,8 +211,8 @@ class MainWindow(uiclass, baseclass):
         ################
         
         self.recipe_function_map = {
-            "SHUTTER": self.recipe_shutter_toggle,
             "RATE_LIMIT": (lambda idx, rate_limit: self.sources[idx].set_rate_limit(float(rate_limit))),
+            "SHUTTER": self.recipe_shutter_toggle,
             "SETPOINT": (lambda idx, setpoint: self.sources[idx].set_setpoint(float(setpoint))),
             "WAIT_UNTIL_SETPOINT": (lambda idx, setpoint: self.recipe_wait_until_setpoint(idx, float(setpoint))),
             "WAIT_FOR_TIME_SECONDS": (lambda _, time: self.recipe_wait_for_time_seconds(int(time)))
@@ -388,6 +388,10 @@ class MainWindow(uiclass, baseclass):
         # Connect start button
         recipe_start_button = getattr(self, "recipe_start_button", None)
         recipe_start_button.clicked.connect(self.toggle_recipe_running)
+        
+        # Connect add step button
+        add_step_button = getattr(self, "add_recipe_step", None)
+        add_step_button.clicked.connect(self.insert_recipe_row)
         
         ###################
         # MISC GUI CONFIG #
@@ -859,8 +863,6 @@ class MainWindow(uiclass, baseclass):
                 self.copied_rows_data[i].append(text)
     
     def recipe_paste_rows(self, start_row):
-        logger.debug("Pasting rows")
-        logger.debug(self.copied_rows_data)
         if not self.copied_rows_data:
             return
         
