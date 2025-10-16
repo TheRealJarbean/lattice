@@ -48,7 +48,6 @@ class Source(QObject):
         self.name = name
         self.id = device_id
         self.addresses = MODBUS_ADDRESSES[address_set]
-        self.process_variable = 0.0
         self.working_setpoint = 0.0
         self.setpoint = 0.0
         self.rate_limit = 0.0
@@ -127,10 +126,9 @@ class Source(QObject):
             if not new_process_variable:
                 return
             
-            self.process_variable = new_process_variable
-            self.process_variable_changed.emit(self.process_variable)
+            self.process_variable_changed.emit(self.new_process_variable)
             
-            if self.safe_rate_limit_from < self.process_variable < self.safe_rate_limit_to:
+            if self.safe_rate_limit_from < new_process_variable < self.safe_rate_limit_to:
                 self.rate_limit_changed.emit(self.safe_rate_limit)
                 self.set_rate_limit(self.safe_rate_limit)
             
