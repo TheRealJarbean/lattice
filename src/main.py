@@ -1,5 +1,5 @@
 import sys
-from PySide6.QtWidgets import QApplication, QMenu, QHeaderView, QComboBox, QTableWidgetItem, QTableWidget, QPushButton
+from PySide6.QtWidgets import QApplication, QMenu, QHeaderView, QComboBox, QTableWidgetItem, QTableWidget, QPushButton, QFileDialog, QMessageBox
 from PySide6.QtCore import Qt, QTimer, QMutex, QThread
 from PySide6.QtGui import QAction, QBrush, QColor
 import pyqtgraph as pg
@@ -9,7 +9,7 @@ import logging
 import os
 import yaml
 import serial
-import math
+import csv
 from functools import partial
 from pymodbus.client import ModbusSerialClient
 
@@ -55,6 +55,13 @@ with open(parameter_config_path, 'r') as f:
     parameter_config = yaml.safe_load(f)
 
 uiclass, baseclass = pg.Qt.loadUiType(main_ui_path)
+
+# Misc Constants
+SHUTTER_RECIPE_OPTIONS = [
+    "",
+    "OPEN",
+    "CLOSE"
+]
 
 # Custom axis for scientific notation in plots
 class ScientificAxis(pg.AxisItem):
@@ -154,7 +161,7 @@ class MainWindow(uiclass, baseclass):
         # mg_bulk and mg_cracker have separate entries for polling power values for some reason,
         # but they are the same physical unit
         # This can be replaced with len(self.sources) if that is changed
-        num_unique_sources = 10 
+        num_unique_sources = 10
             
         # Start polling for data
         # for source in self.sources:
@@ -189,6 +196,9 @@ class MainWindow(uiclass, baseclass):
             ser_reader=self.shutter_reader
             ) for shutter in shutter_config['connections']]
         
+        # Create dict for accessing shutters by name
+        self.shutter_dict = {shutter.name: shutter for shutter in self.shutters}
+        
         # The on_shutter_state_change function will handle any gui
         # changes that need to be made based on shutter state
         # The index of the shutter is baked to the connection in for reference later
@@ -210,9 +220,10 @@ class MainWindow(uiclass, baseclass):
         # RECIPE SETUP #
         ################
         
-        self.recipe_function_map = {
+        # Map recipe actions
+        self.recipe_action_map = {
             "RATE_LIMIT": (lambda idx, rate_limit: self.sources[idx].set_rate_limit(float(rate_limit))),
-            "SHUTTER": self.recipe_shutter_toggle,
+            "SHUTTER": (lambda idx, selection_widget: self.recipe_shutter_toggle(idx, selection_widget)),
             "SETPOINT": (lambda idx, setpoint: self.sources[idx].set_setpoint(float(setpoint))),
             "WAIT_UNTIL_SETPOINT": (lambda idx, setpoint: self.recipe_wait_until_setpoint(idx, float(setpoint))),
             "WAIT_FOR_TIME_SECONDS": (lambda _, time: self.recipe_wait_for_time_seconds(int(time)))
@@ -220,7 +231,9 @@ class MainWindow(uiclass, baseclass):
         
         self.is_recipe_running = False
         self.is_recipe_waiting = False
+        self.recipe_pause_status = (False, None) # Store if paused and timer that was running before pause
         self.current_recipe_step = 0
+        self.recipe_resume_step_time_remaining = None
         
         # WAIT_UNTIL_SETPOINT attributes
         self.check_setpoints_timer = QTimer()
@@ -273,7 +286,10 @@ class MainWindow(uiclass, baseclass):
     
         colors = theme_config['source_tab']['colors']
         for i in range(num_unique_sources):
-            controls = SourceControlWidget(color=f"#{colors[i]}")
+            color = "FFFFFF" # Default color
+            if 0 <= i < len(colors):
+                color = colors[i]
+            controls = SourceControlWidget(color=f"#{color}")
             self.source_controls.append(controls)
             self.source_controls_layout.addWidget(controls)
         
@@ -363,6 +379,7 @@ class MainWindow(uiclass, baseclass):
         #########################
         # RECIPE TAB GUI CONFIG #
         #########################
+        
         self.recipe_table: QTableWidget = getattr(self, "recipe_table", None)
         
         # Configure column resizing: first column stretches, others fixed
@@ -383,15 +400,31 @@ class MainWindow(uiclass, baseclass):
         self.recipe_table.customContextMenuRequested.connect(self.on_recipe_row_context_menu)
         
         # Add dropdown to default row
-        self.add_recipe_variable_dropdown(0)
+        self.add_recipe_action_dropdown(0)
         
         # Connect start button
-        recipe_start_button = getattr(self, "recipe_start_button", None)
-        recipe_start_button.clicked.connect(self.toggle_recipe_running)
+        recipe_start_button = getattr(self, "recipe_start", None)
+        recipe_start_button.clicked.connect(self.recipe_toggle_running)
+        
+        # Connect pause button
+        recipe_pause_button = getattr(self, "recipe_pause", None)
+        recipe_pause_button.clicked.connect(self.recipe_toggle_pause)
         
         # Connect add step button
         add_step_button = getattr(self, "add_recipe_step", None)
-        add_step_button.clicked.connect(self.insert_recipe_row)
+        add_step_button.clicked.connect(lambda: self.recipe_insert_row(self.recipe_table.rowCount()))
+        
+        # Connect save button
+        recipe_save_button = getattr(self, "recipe_save", None)
+        recipe_save_button.clicked.connect(self.recipe_save_to_csv)
+        
+        # Connect load button
+        recipe_load_button = getattr(self, "recipe_load", None)
+        recipe_load_button.clicked.connect(self.recipe_load_from_csv)
+        
+        # Connect new recipe button
+        recipe_new_button = getattr(self, "new_recipe", None)
+        recipe_new_button.clicked.connect(self.recipe_reset)
         
         ###################
         # MISC GUI CONFIG #
@@ -718,12 +751,12 @@ class MainWindow(uiclass, baseclass):
         
         # Add row above action
         add_above = QAction("Add step above", self)
-        add_above.triggered.connect(lambda: self.insert_recipe_row(row))
+        add_above.triggered.connect(lambda: self.recipe_insert_row(row))
         menu.addAction(add_above)
         
         # Add row below action
         add_below = QAction("Add step below", self)
-        add_below.triggered.connect(lambda: self.insert_recipe_row(row + 1))
+        add_below.triggered.connect(lambda: self.recipe_insert_row(row + 1))
         menu.addAction(add_below)
         
         # Delete row action
@@ -748,28 +781,53 @@ class MainWindow(uiclass, baseclass):
         # Show menu at global position
         menu.exec(self.recipe_table.viewport().mapToGlobal(point))
         
-    def add_recipe_variable_dropdown(self, row):
+    def add_recipe_action_dropdown(self, row):
         combo = QComboBox()
-        combo.addItems(self.recipe_function_map.keys())
+        combo.addItems(self.recipe_action_map.keys())
+        combo.currentTextChanged.connect(self.recipe_on_action_changed)
         self.recipe_table.setCellWidget(row, 0, combo)
         
-    def insert_recipe_row(self, row):
+    def recipe_on_action_changed(self, text):
+        if text != "SHUTTER":
+            return
+        
+        sender: QComboBox = self.sender()
+        sender_row = None
+        
+        # Figure out which row the sender is in
+        col = 0
+        for row in range(self.recipe_table.rowCount()):
+            if self.recipe_table.cellWidget(row, col) is sender:
+                sender_row = row
+                break
+                
+        if sender_row is None:
+            logger.error("Couldn't find row of action selection")
+            return
+        
+        for col in range(1, self.recipe_table.columnCount()):
+            combo = QComboBox()
+            combo.addItems(SHUTTER_RECIPE_OPTIONS)
+            self.recipe_table.setCellWidget(sender_row, col, combo)
+        
+    def recipe_insert_row(self, row):
         self.recipe_table.insertRow(row)
-        self.add_recipe_variable_dropdown(row)
+        self.add_recipe_action_dropdown(row)
         
     def recipe_remove_rows(self, selected_rows):
         # Start with higher indexes so lower indexes don't change
         for row in sorted(selected_rows, reverse=True): 
             self.recipe_table.removeRow(row)
         
-    def toggle_recipe_running(self):
-        button: QPushButton = getattr(self, "recipe_start_button", None)
+    def recipe_toggle_running(self):
+        toggle_button: QPushButton = getattr(self, "recipe_start", None)
         self.current_recipe_step = 0
         
         # If recipe is already running
         if self.is_recipe_running:
             self.is_recipe_running = False
             self.is_recipe_waiting = False
+            self.recipe_pause_status = (False, None)
             
             # Stop timer for next step if running
             if self.recipe_wait_timer.isActive():
@@ -779,8 +837,8 @@ class MainWindow(uiclass, baseclass):
             for row in range(self.recipe_table.rowCount()):
                 self._style_row(self.recipe_table, row, "#FFFFFF")
             
-            button.setText("Start Recipe")
-            button.setStyleSheet("""
+            toggle_button.setText("Start Recipe")
+            toggle_button.setStyleSheet("""
                 background-color: rgb(0, 255, 0);
                 """) 
             self.recipe_table.setEnabled(True)
@@ -788,11 +846,12 @@ class MainWindow(uiclass, baseclass):
         
         # If recipe is not running
         self.recipe_table.setEnabled(False)
-        button.setText("Stop Recipe")
-        button.setStyleSheet("""
+        toggle_button.setText("Stop Recipe")
+        toggle_button.setStyleSheet("""
             background-color: rgb(255, 0, 0);
             """) 
         self.is_recipe_running = True
+        self.recipe_pause_status = (False, None)
         self._trigger_next_recipe_step()
         
     def _trigger_next_recipe_step(self):
@@ -800,7 +859,7 @@ class MainWindow(uiclass, baseclass):
         step = self.current_recipe_step
         
         if step == (self.recipe_table.rowCount()):
-            self.toggle_recipe_running()
+            self.recipe_toggle_running()
             return
         
         self._style_row(self.recipe_table, step, "#FDF586")
@@ -815,11 +874,18 @@ class MainWindow(uiclass, baseclass):
         logger.debug(selection)
         
         for col in range(1, self.recipe_table.columnCount()):
+            # Special exception for shutters
+            # Send the entire dropdown to recipe shutter method
+            widget = self.recipe_table.cellWidget(step, col)
+            if widget and isinstance(widget, QComboBox):
+                self.recipe_action_map[selection](col - 1, widget)
+                continue
+                
             item = self.recipe_table.item(step, col)
             value = item.text().strip() if item else ""
             if value:
                 try:
-                    self.recipe_function_map[selection](col - 1, value)
+                    self.recipe_action_map[selection](col - 1, value)
                 except Exception as e:
                     logger.error(f"Error in recipe step {step}: {e}")
         
@@ -828,11 +894,42 @@ class MainWindow(uiclass, baseclass):
         if not self.is_recipe_waiting:
             self._trigger_next_recipe_step()
             
-    def recipe_shutter_toggle(self, idx, open):
-        if open == 1:
-            self.shutters[idx].open()
-        elif open == 0:
-            self.shutters[idx].close()
+    def recipe_toggle_pause(self):
+        if not self.is_recipe_running:
+            return
+        
+        if self.recipe_pause_status[0]:
+            logger.debug("Unpausing recipe")
+            if self.recipe_pause_status[1] is self.recipe_wait_timer:
+                self.recipe_wait_timer.start(self.recipe_resume_step_time_remaining)
+            elif self.recipe_pause_status[1] is self.check_setpoints_timer:
+                self.check_setpoints_timer.start(500)
+            
+            self.recipe_pause_status = (False, None)
+            return
+        
+        logger.debug("Pausing recipe")
+        if self.recipe_wait_timer.isActive():
+            self.recipe_resume_step_time_remaining = self.recipe_wait_timer.remainingTimeAsDuration()
+            self.recipe_wait_timer.stop()
+            self.recipe_pause_status = (True, self.recipe_wait_timer)
+            return
+        
+        if self.check_setpoints_timer.isActive():
+            self.check_setpoints_timer.stop()
+            self.recipe_pause_status = (True, self.check_setpoints_timer)
+        
+            
+    def recipe_shutter_toggle(self, idx, selection_widget: QComboBox):
+        name = self.recipe_table.horizontalHeaderItem(idx + 1).text()
+        
+        state = selection_widget.currentText()
+        if state == "":
+            return
+        elif state == "OPEN":
+            self.shutter_dict[name].open()
+        else:
+            self.shutter_dict[name].close()
           
     def recipe_wait_until_setpoint(self, idx, setpoint):
         self.is_recipe_waiting = True
@@ -898,6 +995,155 @@ class MainWindow(uiclass, baseclass):
                     return
                 
                 self.recipe_table.setCellWidget(start_row + i, col, new_widget)
+                
+    def recipe_save_to_csv(self):
+        path, _ = QFileDialog.getSaveFileName(
+            None, "Save CSV", "", "CSV files (*.csv);;All Files (*)"
+        )
+        
+        if not path:
+            return # User cancelled
+        
+        with open(path, mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            
+            # Write headers
+            headers = [self.recipe_table.horizontalHeaderItem(col).text()
+                       for col in range(self.recipe_table.columnCount())]
+            writer.writerow(headers)
+            
+            # Write table data
+            for row in range(self.recipe_table.rowCount()):
+                row_data = []
+                
+                for col in range(self.recipe_table.columnCount()):
+                    widget = self.recipe_table.cellWidget(row, col)
+                    if isinstance(widget, QComboBox):
+                        row_data.append(widget.currentText())
+                        continue
+                    
+                    item = self.recipe_table.item(row, col)
+                    if item:
+                        row_data.append(item.text())
+                        continue
+                        
+                    row_data.append("")
+                        
+                writer.writerow(row_data)
+                
+    def recipe_load_from_csv(self):
+        msg = "Loading recipe will delete all current steps. Do you want to continue?"
+        if not self.confirm_action(msg):
+            return
+        
+        path, _ = QFileDialog.getOpenFileName(
+            None, "Open CSV", "", "CSV files (*.csv);;All Files (*)"
+        )
+        
+        if not path:
+            return # User cancelled
+        
+        with open(path, newline='', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            rows = list(reader)
+            
+        if not rows:
+            QMessageBox.warning(None, "Empty File", "The selected CSV file is empty.")
+            return
+        
+        # Extract header row from CSV
+        csv_headers = rows[0]
+        
+        # Get headers from existing recipe table
+        recipe_headers = [
+            self.recipe_table.horizontalHeaderItem(col).text()
+            for col in range(self.recipe_table.columnCount())
+        ]
+        
+        # Compare headers
+        # if headers are different csv was likely saved with a different hardware config
+        if csv_headers != recipe_headers:
+            QMessageBox.critical(
+                None,
+                "Header Mismatch",
+                f"""
+                The CSV headers do not match the expected table headers. 
+                Was the CSV saved with a different hardware config?\n\n
+                CSV: {csv_headers}\n
+                Expected: {recipe_headers}
+                """
+            )
+            return
+                    
+        # Clear existing steps
+        for row in reversed(range(self.recipe_table.rowCount())):
+            self.recipe_table.removeRow(row)
+            
+        # Load data
+        data_rows = rows[1:]
+        self.recipe_table.setRowCount(len(data_rows))
+        
+        for row, row_data in enumerate(data_rows):
+            for col, cell_text in enumerate(row_data):
+                # Handle action column
+                if col == 0:
+                    actions = list(self.recipe_action_map.keys())
+                    if cell_text not in actions:
+                        QMessageBox.critical(
+                            None,
+                            "Unknown Action",
+                            f"""
+                            Error loading recipe, unknown action\n\n
+                            CSV: {cell_text}\n
+                            Valid Actions: {actions}
+                            """
+                        )
+                        return
+                    
+                    combo = QComboBox()
+                    combo.addItems(actions)
+                    selected_action_idx = actions.index(cell_text)
+                    combo.setCurrentIndex(selected_action_idx)
+                    
+                    self.recipe_table.setCellWidget(row, col, combo)
+                    continue
+                
+                # Special case for shutter action
+                if self.recipe_table.cellWidget(row, 0).currentText() == "SHUTTER":
+                    if cell_text not in SHUTTER_RECIPE_OPTIONS:
+                        QMessageBox.critical(
+                            None,
+                            "Unknown Shutter State",
+                            f"""
+                            Error loading recipe, unknown shutter state\n\n
+                            CSV: {cell_text}\n
+                            Valid States: {SHUTTER_RECIPE_OPTIONS}
+                            """
+                        )
+                        return
+                    
+                    combo = QComboBox()
+                    combo.addItems(SHUTTER_RECIPE_OPTIONS)
+                    selected_option = SHUTTER_RECIPE_OPTIONS.index(cell_text)
+                    combo.setCurrentIndex(selected_option)
+                    
+                    self.recipe_table.setCellWidget(row, col, combo)
+                    continue
+                    
+                item = QTableWidgetItem(cell_text)
+                self.recipe_table.setItem(row, col, item)
+    
+    def recipe_reset(self):
+        msg = "Creating a new recipe will delete all current steps. Do you want to continue?"
+        if not self.confirm_action(msg):
+            return
+        
+        # Remove all rows
+        for row in reversed(range(self.recipe_table.rowCount())):
+            self.recipe_table.removeRow(row)
+        
+        # Add one new row
+        self.recipe_insert_row(0)
     
     ################
     # MISC METHODS #
@@ -965,6 +1211,20 @@ class MainWindow(uiclass, baseclass):
 
             # Set BG Color
             item.setBackground(QBrush(QColor(bg_color)))
+            
+    def confirm_action(self, msg: str):
+        reply = QMessageBox.question(
+            None,
+            "Confirm Action",
+            msg,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No  # Default selected button
+        )
+
+        if reply == QMessageBox.Yes:
+            return True
+        else:
+            return False
         
 app = QApplication(sys.argv)# 
 window = MainWindow()

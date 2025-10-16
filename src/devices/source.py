@@ -121,7 +121,7 @@ class Source(QObject):
         
     def poll(self):
         with QMutexLocker(self.data_mutex):
-            new_process_variable = self.read_data("process_variable", count=2)
+            new_process_variable = self.get_process_variable()
             if not new_process_variable:
                 return
             
@@ -139,14 +139,15 @@ class Source(QObject):
     def get_name(self) -> str:
         with QMutexLocker(self.data_mutex):
             return self.name
+        
+    def get_process_variable(self) -> float:
+        return self.read_data("process_variable", count=2)
     
     def get_setpoint(self) -> float:
-        with QMutexLocker(self.data_mutex):
-            return self.read_data("setpoint", count=2)
+        return self.read_data("setpoint", count=2)
     
     def get_rate_limit(self) -> float:
-        with QMutexLocker(self.data_mutex):
-            return self.read_data("setpoint_rate_limit", count=2)
+        return self.read_data("setpoint_rate_limit", count=2)
     
     def get_rate_limit_safety(self) -> tuple[float, float, float]:
         """
@@ -159,17 +160,16 @@ class Source(QObject):
         """
         Returns pid_pb, pid_ti, and pid_td as tuple
         """
-        with QMutexLocker(self.data_mutex):
-            pid_pb = self.read_data("pid_pb", count=2)
-            pid_ti = self.read_data("pid_ti", count=2)
-            pid_td = self.read_data("pid_td", count=2)
-            
-            # If any failed to read
-            if None in (pid_pb, pid_ti, pid_td):
-                logger.debug(f"Failed to retrieve a pid value for {self.name}")
-                return (0.0, 0.0, 0.0)
-            
-            return (pid_pb, pid_ti, pid_td)
+        pid_pb = self.read_data("pid_pb", count=2)
+        pid_ti = self.read_data("pid_ti", count=2)
+        pid_td = self.read_data("pid_td", count=2)
+        
+        # If any failed to read
+        if None in (pid_pb, pid_ti, pid_td):
+            logger.debug(f"Failed to retrieve a pid value for {self.name}")
+            return (0.0, 0.0, 0.0)
+        
+        return (pid_pb, pid_ti, pid_td)
         
     def get_max_process_variable(self):
         with QMutexLocker(self.data_mutex):
@@ -220,6 +220,11 @@ class Source(QObject):
             pass
             
     def is_pv_close_to_sp(self):
-        with QMutexLocker(self.data_mutex):
-            # TODO: Ask if rel_tol would be more appropriate
-            return math.isclose(self.setpoint, self.process_variable, abs_tol=0.5)
+        # TODO: Ask if rel_tol would be more appropriate
+        current_sp = self.get_setpoint()
+        current_pv = self.get_process_variable()
+        if None in [current_sp, current_pv]:
+            logger.error("Could not read sp or pv when comparing sp and pv")
+            return
+        
+        return math.isclose(current_sp, current_pv, abs_tol=0.5)
