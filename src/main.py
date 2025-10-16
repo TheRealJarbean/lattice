@@ -287,7 +287,8 @@ class MainWindow(uiclass, baseclass):
             controls.safety_button.clicked.connect(partial(self.open_safe_rate_limit_input_modal, i))
 
             # Connect set buttons
-            controls.set_button.clicked.connect(partial(self.on_source_set_clicked, i))
+            controls.set_setpoint_button.clicked.connect(partial(self.on_source_setpoint_set_clicked, i))
+            controls.set_rate_limit_button.clicked.connect(partial(self.on_source_rate_limit_set_clicked, i))
             
             # Connect variable displays
             self.sources[i].process_variable_changed.connect(
@@ -453,12 +454,13 @@ class MainWindow(uiclass, baseclass):
 
     def on_new_source_data(self, idx, data):
         self.source_data[idx].append((time.monotonic(), data))
-    
-    def on_source_set_clicked(self, idx):
-        setpoint = self.source_controls[idx].input_setpoint.value()
-        rate_limit = self.source_controls[idx].input_rate_limit.value()
         
+    def on_source_setpoint_set_clicked(self, idx):
+        setpoint = self.source_controls[idx].input_setpoint.value()
         self.sources[idx].set_setpoint(setpoint)
+    
+    def on_source_rate_limit_set_clicked(self, idx):
+        rate_limit = self.source_controls[idx].input_rate_limit.value()
         self.sources[idx].set_rate_limit(rate_limit)
     
     def open_pid_input_modal(self, idx):
