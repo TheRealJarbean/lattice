@@ -17,45 +17,47 @@
 
 devices:
   pressure:
-    serial:
-      port: null
-      baudrate: 9600
-    connections:
-      - name: Growth Ion
-        address: 0
-      - name: Flux Ion
-        address: 1
-      - name: Intro Ion
-        address: 2
-      - name: Intro Thermocouple
-        address: 3
+    COM4:
+      serial:
+        port: null
+        baudrate: 9600
+      connections:
+        - name: Growth Ion
+          address: 0
+        - name: Flux Ion
+          address: 1
+        - name: Intro Ion
+          address: 2
+        - name: Intro Thermocouple
+          address: 3
 
   shutters:
-    serial:
-      port: null
-      baudrate: 9600
-    connections:
-      - name: Aluminum
-        address: 0
-      - name: Scandium
-        address: 0
-      - name: none
-        address: 0
-      - name: Magnesium
-        address: 0
-      - name: Gallium
-        address: 0
-      - name: Indium
-        address: 0
-      - name: Silicon
-        address: 7
-      - name: Beryllium
-        address: 0
+    COM8:
+      serial:
+        port: null
+        baudrate: 9600
+      connections:
+        - name: Aluminum
+          address: 0
+        - name: Scandium
+          address: 0
+        - name: none
+          address: 0
+        - name: Magnesium
+          address: 0
+        - name: Gallium
+          address: 0
+        - name: Indium
+          address: 0
+        - name: Silicon
+          address: 7
+        - name: Beryllium
+          address: 0
 
   sources:
-    effusion_cells:
+    COM10:
       serial:
-        port: none
+        port: null
         baudrate: 9600
       connections:
         - name: Gallium
@@ -83,9 +85,8 @@ devices:
           device_id: 4
           address_set: loop_2
     
-    mg_bulk_pid:
+    COM11:
       serial:
-        # port: COM11
         port: null
         baudrate: 9600
       connections:
@@ -93,32 +94,11 @@ devices:
           device_id: 4
           address_set: loop_1
     
-    mg_cracker_pid:
+    COM12:
       serial:
-        # port: COM13
         port: null
         baudrate: 9600
       connections:
         - name: Mg Cracker PID
-          device_id: 5
-          address_set: loop_1
-    
-    mg_bulk_dc:
-      serial:
-        # port: COM12
-        port: null
-        baudrate: 9600
-      connections:
-        - name: Mg Bulk DC
-          device_id: 4
-          address_set: loop_1
-
-    mg_cracker_dc:
-      serial:
-        # port: COM14
-        port: null
-        baudrate: 9600
-      connections:
-        - name: Mg Cracker DC
           device_id: 5
           address_set: loop_1
