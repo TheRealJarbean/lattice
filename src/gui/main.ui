@@ -2980,11 +2980,11 @@ QHeaderView::section:disabled {
  <resources/>
  <connections/>
  <buttongroups>
-  <buttongroup name="shutter_loop_state_buttons"/>
   <buttongroup name="shutter_control_button_group">
    <property name="exclusive">
     <bool>false</bool>
    </property>
   </buttongroup>
+  <buttongroup name="shutter_loop_state_buttons"/>
  </buttongroups>
 </ui>
