@@ -383,11 +383,11 @@ class MainWindow(uiclass, baseclass):
         
         self.recipe_table: QTableWidget = getattr(self, "recipe_table", None)
         
-        # Configure column resizing: first column stretches, others fixed
-        self.recipe_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        for col in range(1, 11):
-            self.recipe_table.horizontalHeader().setSectionResizeMode(col, QHeaderView.Fixed)
-            self.recipe_table.setColumnWidth(col, 100)
+        # Configure column resizing: first column fixed, others stretch
+        self.recipe_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self.recipe_table.setColumnWidth(0, 200)
+        for col in range(1, self.recipe_table.columnCount()):
+            self.recipe_table.horizontalHeader().setSectionResizeMode(col, QHeaderView.Stretch)
             
         # Label columns with source names
         column_names = ["Variable"] + [source.get_name() for source in self.sources]
