@@ -19,6 +19,7 @@ from devices.source import Source
 from devices.pressure import Pressure
 from utils.serial_reader import SerialReader
 from gui.input_modal_widget import InputModalWidget
+from gui.pressure_control_widget import PressureControlWidget
 from gui.source_control_widget import SourceControlWidget
 
 # Set the log level based on env variable when program is run
@@ -100,35 +101,17 @@ class MainWindow(uiclass, baseclass):
                 serial_mutex=mutex
                 ) for gauge in pressure_config['connections']])
         
-        # Initialize pressure data object
+        # Initialize pressure data object and connect signal
         self.pressure_data = []
-        for gauge in self.pressure_gauges:
+        for i, gauge in enumerate(self.pressure_gauges):
             self.pressure_data.append([])
+            gauge.pressure_changed.connect(
+                lambda data, idx=i: self.pressure_data[idx].append((self.time_since_start(), data))
+            )
         
         # Start polling for data
         # for gauge in self.pressure_gauges:
         #     gauge.start_polling()
-            
-        # Connect pressure gauge signals
-        for i, gauge in enumerate(self.pressure_gauges):
-            # Update displayed pressure
-            pressure_label = getattr(self, f"pressure_display_{i}", None)
-            gauge.pressure_changed.connect(lambda pressure, label=pressure_label: label.setText(f"{pressure:.2e}"))
-            
-            # Update rate of change
-            rate_label = getattr(self, f"pressure_rate_{i}", None)
-            gauge.rate_changed.connect(lambda rate, label=rate_label: label.setText(f"{rate:.2f}"))
-            
-            # Update stored data
-            gauge.pressure_changed.connect(
-                lambda data, idx=i: self.pressure_data[idx].append((self.time_since_start(), data))
-            )
-            
-            # Update on off button state
-            toggle_button = getattr(self, f"pressure_toggle_{i}", None)
-            gauge.is_on_changed.connect(
-                lambda is_on, b=toggle_button: b.setText("Turn off" if is_on else "Turn on")
-            )
         
         ################
         # SOURCE SETUP #
@@ -252,10 +235,34 @@ class MainWindow(uiclass, baseclass):
         # PRESSURE TAB GUI CONFIG #
         ###########################
         
-        # Connect gauge toggle buttons
+        # Create the pressure control widgets
+        self.pressure_controls_layout = getattr(self, "pressure_controls", None)
+        self.pressure_controls: list[PressureControlWidget] = []
+        
+        step_size = int(360 / len(self.pressure_gauges))
         for i, gauge in enumerate(self.pressure_gauges):
-            button = getattr(self, f"pressure_toggle_{i}", None)
-            button.clicked.connect(gauge.toggle_on_off)
+            hue = (i * step_size) + 15
+            saturation = 255
+            brightness = 255
+            color = QColor()
+            color.setHsv(hue, saturation, brightness)
+            controls = PressureControlWidget(gauge.name, color)
+            self.pressure_controls.append(controls)
+            self.pressure_controls_layout.addWidget(controls)
+            
+            # Connect displayed pressure
+            gauge.pressure_changed.connect(lambda pressure, label=controls.pressure_display: label.setText(f"{pressure:.2e}"))
+            
+            # Connect rate display
+            gauge.rate_changed.connect(lambda rate, label=controls.rate_display: label.setText(f"{rate:.2f}"))
+            
+            # Connect on / off button text
+            gauge.is_on_changed.connect(
+                lambda is_on, b=controls.power_toggle_button: b.setText("Turn off" if is_on else "Turn on")
+            )
+            
+            # Connect power toggle button action
+            controls.power_toggle_button.clicked.connect(gauge.toggle_on_off)
         
         # Configure pressure data plot
         self.pressure_graph_widget.plotItem.setAxisItems({'left': ScientificAxis('left')})
@@ -264,10 +271,8 @@ class MainWindow(uiclass, baseclass):
         self.pressure_graph_widget.setXRange(0, 30)
         self.pressure_graph_widget.setYRange(-1, 1) # TODO: change this
         self.pressure_curves = [
-            self.pressure_graph_widget.plot(pen=pg.mkPen('r', width=2)),
-            self.pressure_graph_widget.plot(pen=pg.mkPen('g', width=2)),
-            self.pressure_graph_widget.plot(pen=pg.mkPen('b', width=2)),
-            self.pressure_graph_widget.plot(pen=pg.mkPen('y', width=2))
+            self.pressure_graph_widget.plot(pen=pg.mkPen(controls.color, width=2))
+            for controls in self.pressure_controls
         ]
         for curve in self.pressure_curves:
             curve.setClipToView(True)
