@@ -14,7 +14,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QColor, QPainter, QBrush, QFont
 from PySide6.QtCore import Qt, Signal
 
-
 class ColorCircle(QLabel):
     color_changed = Signal(str)
     

@@ -80,25 +80,25 @@ class MainWindow(uiclass, baseclass):
         # PRESSURE SETUP #
         ##################
         
-        pressure_config = hardware_config['devices']['pressure']
+        self.pressure_gauges: list[Pressure] = []
         
-        # Configure pressure serial port
-        ser = serial.Serial(
-            port=pressure_config['serial']['port'], 
-            baudrate=pressure_config['serial']['baudrate']
-            )
-        mutex = QMutex()
-        
-        # Create pressure gauge objects
-        self.pressure_reader = SerialReader(ser, mutex)
-        self.pressure_reader.start()
-        self.pressure_gauges = [Pressure(
-            name=gauge['name'], 
-            address=gauge['address'],
-            ser=ser, 
-            ser_reader=self.pressure_reader,
-            serial_mutex=mutex
-            ) for gauge in pressure_config['connections']]
+        for pressure_config in hardware_config['devices']['pressure'].values():
+            ser = serial.Serial(
+                port=pressure_config['serial']['port'], 
+                baudrate=pressure_config['serial']['baudrate']
+                )
+            
+            mutex = QMutex()
+            reader = SerialReader(ser, mutex)
+            reader.start()
+            
+            self.pressure_gauges.extend([Pressure(
+                name=gauge['name'], 
+                address=gauge['address'],
+                ser=ser, 
+                ser_reader=reader,
+                serial_mutex=mutex
+                ) for gauge in pressure_config['connections']])
         
         # Initialize pressure data object
         self.pressure_data = []
@@ -134,9 +134,6 @@ class MainWindow(uiclass, baseclass):
         # SOURCE SETUP #
         ################
         
-        # Sources are the only devices that have multiple physical connections
-        # An empty list is created first, then each device on each different connection
-        # is appended
         self.sources: list[Source] = []
         
         safety_settings = parameter_config['sources']['rate_limit_safety']
@@ -179,22 +176,26 @@ class MainWindow(uiclass, baseclass):
         #################
         # SHUTTER SETUP #
         #################
-        shutter_config = hardware_config['devices']['shutters']
-        ser = serial.Serial(
-            port=shutter_config['serial']['port'], 
-            baudrate=shutter_config['serial']['baudrate']
-            )
-        mutex = QMutex()
         
-        self.shutter_reader = SerialReader(ser, mutex)
-        self.shutter_reader.start()
-        self.shutters = [Shutter(
-            name=shutter['name'], 
-            address=shutter['address'], 
-            ser=ser, 
-            mutex=mutex,
-            ser_reader=self.shutter_reader
-            ) for shutter in shutter_config['connections']]
+        self.shutters: list[Shutter] = []
+        
+        for shutter_config in hardware_config['devices']['shutters'].values():
+            ser = serial.Serial(
+                port=shutter_config['serial']['port'], 
+                baudrate=shutter_config['serial']['baudrate']
+                )
+            
+            mutex = QMutex()
+            reader = SerialReader(ser, mutex)
+            reader.start()
+            
+            self.shutters.extend([Shutter(
+                name=shutter['name'], 
+                address=shutter['address'], 
+                ser=ser, 
+                mutex=mutex,
+                ser_reader=reader
+                ) for shutter in shutter_config['connections']])
         
         # Create dict for accessing shutters by name
         self.shutter_dict = {shutter.name: shutter for shutter in self.shutters}
@@ -398,6 +399,8 @@ class MainWindow(uiclass, baseclass):
         # Add custom context menu for adding and removing steps
         self.recipe_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.recipe_table.customContextMenuRequested.connect(self.on_recipe_row_context_menu)
+        self.recipe_table.verticalHeader().setContextMenuPolicy(Qt.CustomContextMenu)
+        self.recipe_table.verticalHeader().customContextMenuRequested.connect(self.on_recipe_row_context_menu)
         
         # Add dropdown to default row
         self.add_recipe_action_dropdown(0)
@@ -745,6 +748,7 @@ class MainWindow(uiclass, baseclass):
             return # No row under the cursor
         
         selected_rows = set(idx.row() for idx in self.recipe_table.selectedIndexes())
+        selected_rows.add(row) # Ensure currently clicked row is included
         
         # Create context menu
         menu = QMenu(self)
