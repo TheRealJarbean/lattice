@@ -1,5 +1,10 @@
 import sys
-from PySide6.QtWidgets import QApplication, QMenu, QHeaderView, QComboBox, QTableWidgetItem, QTableWidget, QPushButton, QFileDialog, QMessageBox
+from PySide6.QtWidgets import (
+    QApplication, QMenu, QHeaderView,
+    QComboBox, QTableWidgetItem, QTableWidget, 
+    QPushButton, QFileDialog, QMessageBox,
+    QSpacerItem, QSizePolicy
+)
 from PySide6.QtCore import Qt, QTimer, QMutex, QThread
 from PySide6.QtGui import QAction, QBrush, QColor
 import pyqtgraph as pg
@@ -241,11 +246,17 @@ class MainWindow(uiclass, baseclass):
         
         step_size = int(360 / len(self.pressure_gauges))
         for i, gauge in enumerate(self.pressure_gauges):
+            # Add a spacer
+            self.pressure_controls_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+            
+            # Generate a unique color
             hue = (i * step_size) + 15
             saturation = 255
             brightness = 255
             color = QColor()
             color.setHsv(hue, saturation, brightness)
+            
+            # Create control widget
             controls = PressureControlWidget(gauge.name, color)
             self.pressure_controls.append(controls)
             self.pressure_controls_layout.addWidget(controls)
@@ -263,6 +274,9 @@ class MainWindow(uiclass, baseclass):
             
             # Connect power toggle button action
             controls.power_toggle_button.clicked.connect(gauge.toggle_on_off)
+            
+        # Add one last spacer (at this point the layout is | widget | widget ... with no closing spacer)
+        self.pressure_controls_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
         
         # Configure pressure data plot
         self.pressure_graph_widget.plotItem.setAxisItems({'left': ScientificAxis('left')})

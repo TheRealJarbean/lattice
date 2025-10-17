@@ -1,104 +1,69 @@
-# IMPORTANT: For recipes to function properly, the order of sources and shutters must correspond to one another.
-# The names do not have to match, but the order must match for the devices to associate with one another
-# Ex.
-# shutters:
-#   connections:
-#     - name: Gallium
-#     - name: Aluminum
-#     - name: Beryllium
-# sources:
-#   connections:
-#     - name: Ga
-#     - name: Al
-#     - name: Be
-#
-# Most device settings in other locations are keyed by the names here, so name changes
-# can result in configs being lost, be sure to back up configs before changing hardware settings
-
 devices:
   pressure:
-    COM4:
+    'null':
       serial:
         port: null
         baudrate: 9600
       connections:
-        - name: Growth Ion
-          address: 0
-        - name: Flux Ion
-          address: 1
-        - name: Intro Ion
-          address: 2
-        - name: Intro Thermocouple
-          address: 3
-
-  shutters:
-    COM8:
-      serial:
-        port: null
-        baudrate: 9600
-      connections:
-        - name: Aluminum
-          address: 0
-        - name: Scandium
-          address: 0
-        - name: none
-          address: 0
-        - name: Magnesium
-          address: 0
-        - name: Gallium
-          address: 0
-        - name: Indium
-          address: 0
-        - name: Silicon
-          address: 7
-        - name: Beryllium
-          address: 0
-
+      - name: Growth Ion
+        address: 0
+      - name: Flux Ion
+        address: 1
+      - name: Intro Ion
+        address: 2
+      - name: Intro Thermocouple
+        address: 3
   sources:
-    COM10:
+    'null':
       serial:
         port: null
         baudrate: 9600
       connections:
-        - name: Gallium
-          device_id: 1
-          address_set: loop_1
-        - name: Scandium
-          device_id: 1
-          address_set: loop_2
-        - name: Beryllium
-          device_id: 2
-          address_set: loop_1
-        - name: Aluminum
-          device_id: 2
-          address_set: loop_2
-        - name: Indium
-          device_id: 3
-          address_set: loop_1
-        - name: Silicon
-          device_id: 3
-          address_set: loop_2
-        - name: Substrate
-          device_id: 4
-          address_set: loop_1
-        - name: Intro
-          device_id: 4
-          address_set: loop_2
-    
-    COM11:
+      - name: Gallium
+        device_id: 1
+        address_set: loop_1
+      - name: Scandium
+        device_id: 1
+        address_set: loop_2
+      - name: Beryllium
+        device_id: 2
+        address_set: loop_1
+      - name: Aluminum
+        device_id: 2
+        address_set: loop_2
+      - name: Indium
+        device_id: 3
+        address_set: loop_1
+      - name: Silicon
+        device_id: 3
+        address_set: loop_2
+      - name: Substrate
+        device_id: 4
+        address_set: loop_1
+      - name: Intro
+        device_id: 4
+        address_set: loop_2
+      - name: Mg Bulk PID
+        device_id: 4
+        address_set: loop_1
+      - name: Mg Cracker PID
+        device_id: 5
+        address_set: loop_1
+  shutters:
+    'null':
       serial:
         port: null
         baudrate: 9600
       connections:
-        - name: Mg Bulk PID
-          device_id: 4
-          address_set: loop_1
-    
-    COM12:
-      serial:
-        port: null
-        baudrate: 9600
-      connections:
-        - name: Mg Cracker PID
-          device_id: 5
-          address_set: loop_1
+      - name: Gallium
+        address: 0
+      - name: Scandium
+        address: 0
+      - name: Beryllium
+        address: 0
+      - name: Aluminum
+        address: 0
+      - name: Indium
+        address: 0
+      - name: Silicon
+        address: 7
