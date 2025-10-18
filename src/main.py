@@ -173,15 +173,15 @@ class MainWindow(uiclass, baseclass):
                 baudrate=shutter_config['serial']['baudrate']
                 )
             
-            mutex = QMutex()
-            reader = SerialReader(ser, mutex)
+            serial_mutex = QMutex()
+            reader = SerialReader(ser, serial_mutex)
             reader.start()
             
             self.shutters.extend([Shutter(
                 name=shutter['name'], 
                 address=shutter['address'], 
                 ser=ser, 
-                mutex=mutex,
+                serial_mutex=serial_mutex,
                 ser_reader=reader
                 ) for shutter in shutter_config['connections']])
         
@@ -367,6 +367,17 @@ class MainWindow(uiclass, baseclass):
         for i in range(len(self.shutters)):
             shutter_name_label = getattr(self, f"shutter_name_{i}")
             shutter_name_label.setText(self.shutters[i].name)
+            
+        # Connect shutter enable/disable buttons to logic
+        for i in range(len(self.shutters)):
+            shutter_control_button = getattr(self, f"shutter_control_button_{i}")
+            shutter_control_button.setProperty('shutter_idx', i)
+            shutter_control_button.setProperty('is_on', True)
+            shutter_control_button.clicked.connect(self.on_shutter_control_button_click)
+            
+        # Connect shutter disable all button
+        shutter_control_off_all_button = getattr(self, "shutter_control_off_all")
+        shutter_control_off_all_button.clicked.connect(self.on_shutter_control_off_all_click)
             
         # Connect manual shutter control buttons to logic
         for i in range(len(self.shutters)):
@@ -728,18 +739,52 @@ class MainWindow(uiclass, baseclass):
             
         if is_open:
             button.setText("Closed")
-            button.setProperty("is_open", not is_open)
+            button.setProperty("is_open", False)
             button.setStyleSheet("""
                 background-color: rgb(255, 0, 0);
                 border: 1px solid black;                     
             """)
+            return
+        
+        button.setText("Open")
+        button.setProperty("is_open", True)
+        button.setStyleSheet("""
+            background-color: rgb(0, 255, 0);
+            border: 1px solid black;                     
+        """)
+            
+    def on_shutter_control_button_click(self, is_on=None, idx=None):
+        if None in (is_on, idx):
+            button: QPushButton = self.sender()
+            is_on = button.property("is_on")
+            idx = button.property("shutter_idx")
         else:
-            button.setText("Open")
-            button.setProperty("is_open", not is_open)
+            button = getattr(self, f"shutter_control_button_{idx}", None)
+        
+        if button is None:
+            return
+            
+        if is_on:
+            button.setText("OFF")
+            button.setProperty("is_on", False)
             button.setStyleSheet("""
-                background-color: rgb(0, 255, 0);
-                border: 1px solid black;                     
+                background-color: rgb(255, 0, 0);
+                border: 1px solid black;                
             """)
+            self.shutters[idx].disable()
+            return
+        
+        button.setText("ON")
+        button.setProperty("is_on", True)
+        button.setStyleSheet("""
+            background-color: rgb(0, 255, 0);
+            border: 1px solid black;                
+        """)
+        self.shutters[idx].enable()
+    
+    def on_shutter_control_off_all_click(self):
+        for i in range(len(self.shutters)):
+            self.on_shutter_control_button_click(True, i)
             
     def on_shutter_output_button_click(self):
         button = self.sender()
@@ -811,9 +856,6 @@ class MainWindow(uiclass, baseclass):
         self.recipe_table.setCellWidget(row, 0, combo)
         
     def recipe_on_action_changed(self, text):
-        if text != "SHUTTER":
-            return
-        
         sender: QComboBox = self.sender()
         sender_row = None
         
@@ -828,10 +870,16 @@ class MainWindow(uiclass, baseclass):
             logger.error("Couldn't find row of action selection")
             return
         
+        if text == "SHUTTER":
+            for col in range(1, self.recipe_table.columnCount()):
+                combo = QComboBox()
+                combo.addItems(SHUTTER_RECIPE_OPTIONS)
+                self.recipe_table.setCellWidget(sender_row, col, combo)
+            return
+        
         for col in range(1, self.recipe_table.columnCount()):
-            combo = QComboBox()
-            combo.addItems(SHUTTER_RECIPE_OPTIONS)
-            self.recipe_table.setCellWidget(sender_row, col, combo)
+            self.recipe_table.removeCellWidget(row, col)
+            self.recipe_table.setItem(row, col, QTableWidgetItem(""))
         
     def recipe_insert_row(self, row):
         self.recipe_table.insertRow(row)
@@ -921,6 +969,8 @@ class MainWindow(uiclass, baseclass):
         if not self.is_recipe_running:
             return
         
+        pause_button: QPushButton = getattr(self, "recipe_pause", None)
+        
         if self.recipe_pause_status[0]:
             logger.debug("Unpausing recipe")
             if self.recipe_pause_status[1] is self.recipe_wait_timer:
@@ -929,6 +979,11 @@ class MainWindow(uiclass, baseclass):
                 self.check_setpoints_timer.start(500)
             
             self.recipe_pause_status = (False, None)
+            
+            pause_button.setText("Pause")
+            pause_button.setStyleSheet("""
+                background-color: rgb(255, 255, 0);
+                """)
             return
         
         logger.debug("Pausing recipe")
@@ -936,11 +991,15 @@ class MainWindow(uiclass, baseclass):
             self.recipe_resume_step_time_remaining = self.recipe_wait_timer.remainingTimeAsDuration()
             self.recipe_wait_timer.stop()
             self.recipe_pause_status = (True, self.recipe_wait_timer)
-            return
         
-        if self.check_setpoints_timer.isActive():
+        elif self.check_setpoints_timer.isActive():
             self.check_setpoints_timer.stop()
             self.recipe_pause_status = (True, self.check_setpoints_timer)
+        
+        pause_button.setText("Resume")
+        pause_button.setStyleSheet("""
+            background-color: rgb(0, 255, 0);
+            """)
         
             
     def recipe_shutter_toggle(self, idx, selection_widget: QComboBox):

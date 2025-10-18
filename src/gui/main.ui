@@ -29,7 +29,7 @@
 }</string>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>3</number>
       </property>
       <property name="tabsClosable">
        <bool>false</bool>
@@ -910,6 +910,9 @@ border: 1px solid black;</string>
         <property name="text">
          <string>ON</string>
         </property>
+        <property name="is_on" stdset="0">
+         <bool>true</bool>
+        </property>
        </widget>
        <widget class="QLabel" name="label_29">
         <property name="geometry">
@@ -924,7 +927,7 @@ border: 1px solid black;</string>
          <string>Shutter Control</string>
         </property>
        </widget>
-       <widget class="QPushButton" name="pushButton_69">
+       <widget class="QPushButton" name="shutter_control_off_all">
         <property name="geometry">
          <rect>
           <x>170</x>
@@ -989,6 +992,9 @@ border: 1px solid black;</string>
         <property name="text">
          <string>ON</string>
         </property>
+        <property name="is_on" stdset="0">
+         <bool>true</bool>
+        </property>
        </widget>
        <widget class="QPushButton" name="shutter_control_button_2">
         <property name="geometry">
@@ -1005,6 +1011,9 @@ border: 1px solid black;</string>
         </property>
         <property name="text">
          <string>ON</string>
+        </property>
+        <property name="is_on" stdset="0">
+         <bool>true</bool>
         </property>
        </widget>
        <widget class="QPushButton" name="shutter_control_button_3">
@@ -1023,6 +1032,9 @@ border: 1px solid black;</string>
         <property name="text">
          <string>ON</string>
         </property>
+        <property name="is_on" stdset="0">
+         <bool>true</bool>
+        </property>
        </widget>
        <widget class="QPushButton" name="shutter_control_button_4">
         <property name="geometry">
@@ -1039,6 +1051,9 @@ border: 1px solid black;</string>
         </property>
         <property name="text">
          <string>ON</string>
+        </property>
+        <property name="is_on" stdset="0">
+         <bool>true</bool>
         </property>
        </widget>
        <widget class="QPushButton" name="shutter_control_button_5">
@@ -1057,6 +1072,9 @@ border: 1px solid black;</string>
         <property name="text">
          <string>ON</string>
         </property>
+        <property name="is_on" stdset="0">
+         <bool>true</bool>
+        </property>
        </widget>
        <widget class="QPushButton" name="shutter_control_button_6">
         <property name="geometry">
@@ -1074,6 +1092,9 @@ border: 1px solid black;</string>
         <property name="text">
          <string>ON</string>
         </property>
+        <property name="is_on" stdset="0">
+         <bool>true</bool>
+        </property>
        </widget>
        <widget class="QPushButton" name="shutter_control_button_7">
         <property name="geometry">
@@ -1090,6 +1111,9 @@ border: 1px solid black;</string>
         </property>
         <property name="text">
          <string>ON</string>
+        </property>
+        <property name="is_on" stdset="0">
+         <bool>true</bool>
         </property>
        </widget>
        <widget class="QPushButton" name="shutter_output_button_1">
@@ -2657,6 +2681,12 @@ QHeaderView::section:disabled {
               <height>50</height>
              </size>
             </property>
+            <property name="font">
+             <font>
+              <pointsize>12</pointsize>
+              <bold>true</bold>
+             </font>
+            </property>
             <property name="styleSheet">
              <string notr="true">background-color: rgb(0, 255, 0);</string>
             </property>
@@ -2672,6 +2702,15 @@ QHeaderView::section:disabled {
               <width>300</width>
               <height>50</height>
              </size>
+            </property>
+            <property name="font">
+             <font>
+              <pointsize>12</pointsize>
+              <bold>true</bold>
+             </font>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">background-color: rgb(255, 255, 0);</string>
             </property>
             <property name="text">
              <string>Pause</string>
