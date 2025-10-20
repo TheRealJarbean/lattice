@@ -1,69 +1,71 @@
 devices:
   pressure:
-    'null':
+    COM6:
       serial:
-        port: null
+        port: COM6
         baudrate: 9600
       connections:
       - name: Growth Ion
-        address: 0
+        address: I1
       - name: Flux Ion
-        address: 1
-      - name: Intro Ion
-        address: 2
-      - name: Intro Thermocouple
-        address: 3
+        address: I2
   sources:
-    'null':
+    COM10:
       serial:
-        port: null
+        port: COM10
         baudrate: 9600
       connections:
-      - name: Gallium
-        device_id: 1
-        address_set: loop_1
       - name: Scandium
         device_id: 1
-        address_set: loop_2
+        address_set: 2604_loop_1
+      - name: Gallium
+        device_id: 1
+        address_set: 2604_loop_2
       - name: Beryllium
         device_id: 2
-        address_set: loop_1
+        address_set: 2604_loop_1
       - name: Aluminum
         device_id: 2
-        address_set: loop_2
+        address_set: 2604_loop_2
       - name: Indium
         device_id: 3
-        address_set: loop_1
+        address_set: 2604_loop_1
       - name: Silicon
         device_id: 3
-        address_set: loop_2
-      - name: Substrate
+        address_set: 2604_loop_2
+      - name: Growth
         device_id: 4
-        address_set: loop_1
-      - name: Intro
+        address_set: 2604_loop_1
+      - name: Magnesium
         device_id: 4
-        address_set: loop_2
-      - name: Mg Bulk PID
-        device_id: 4
-        address_set: loop_1
-      - name: Mg Cracker PID
-        device_id: 5
-        address_set: loop_1
+        address_set: 2604_loop_2
+    COM13:
+      serial:
+        port: COM13
+        baudrate: 9600
+      connections:
+      - name: Mg Cracker
+        device_id: 1
+        address_set: 2404_loop_1
   shutters:
-    'null':
+    COM8:
       serial:
-        port: null
+        port: COM8
         baudrate: 9600
       connections:
-      - name: Gallium
-        address: 0
       - name: Scandium
+        address: 0
+      - name: Gallium
         address: 0
       - name: Beryllium
         address: 0
       - name: Aluminum
         address: 0
       - name: Indium
-        address: 0
+        address: 6
       - name: Silicon
-        address: 7
+        address: 0
+      - name: Growth
+        address: 0
+      - name: Magnesium
+        address: 0

@@ -7,21 +7,32 @@ import math
 logger = logging.getLogger(__name__)
 
 MODBUS_ADDRESSES = {
-    "loop_1": {
+    "2604_loop_1": {
         "setpoint": 32816,
+        "working_setpoint": 32778,
         "setpoint_rate_limit": 32838,
         "process_variable": 32770,
         "pid_pb": 33470,
         "pid_ti": 33472,
         "pid_td": 33474
     },
-    "loop_2": {
+    "2604_loop_2": {
         "setpoint": 34864,
+        "working_setpoint": 34826,
         "setpoint_rate_limit": 34886,
         "process_variable": 34818,
         "pid_pb": 35518,
         "pid_ti": 35520,
         "pid_td": 35522
+    },
+    "2404_loop_1": {
+        "setpoint": 32816,
+        "working_setpoint": 32778,
+        "setpoint_rate_limit": 32838,
+        "process_variable": 32770,
+        "pid_pb": 32780,
+        "pid_ti": 32784,
+        "pid_td": 32786
     }
 }
 
@@ -50,7 +61,7 @@ class Source(QObject):
         self.addresses = MODBUS_ADDRESSES[address_set]
         self.working_setpoint = 0.0
         self.setpoint = 0.0
-        self.rate_limit = 0.0
+        self.rate_limit = -1
         self.client = client
         self.serial_mutex = serial_mutex
         self.data_mutex = QMutex()
@@ -75,26 +86,30 @@ class Source(QObject):
         self.poll_timer.timeout.connect(self.poll)
         
     def read_data(self, key, count=1):
+        self.data_mutex.lock()
         self.serial_mutex.lock()
         try:
             addresses = self.addresses
             res = self.client.read_holding_registers(address=addresses[key], count=count, device_id=self.id)
-            
+
             if res.isError():
                 logger.warning(f"Modbus response was error when reading {key} from source {self.id}, {self.name}: {res}")
                 return None
             
             value = self.client.convert_from_registers(res.registers, self.client.DATATYPE.FLOAT32)
+
             return value
         
-        except ModbusException as e:
+        except Exception as e:
             logger.error(f"Error reading {key} from source {self.id}, {self.name}: {e}")
             return None
         
         finally:
             self.serial_mutex.unlock()
+            self.data_mutex.unlock()
         
     def write_data(self, key, value):
+        self.data_mutex.lock()
         self.serial_mutex.lock()
         try:
             addresses = self.addresses
@@ -107,41 +122,71 @@ class Source(QObject):
             logger.error(f"Error writing {key} to source id {self.id}, {self.name}: {e}")
         
         finally:
+            self.data_mutex.unlock()
             self.serial_mutex.unlock()
         
     def start_polling(self):
-        with QMutexLocker(self.data_mutex):
-            if not self.poll_timer.isActive():
-                self.poll_timer.start(500)
+        self.data_mutex.lock()
+        if not self.poll_timer.isActive():
+            logger.debug(f"Beginning poll for source {self.name}")
+            self.poll_timer.start(500)
+        self.data_mutex.unlock()
     
     def stop_polling(self):
-        with QMutexLocker(self.data_mutex):
-            if self.poll_timer.isActive():
-                self.poll_timer.stop()
+        self.data_mutex.lock()
+        if self.poll_timer.isActive():
+            self.poll_timer.stop()
+        self.data_mutex.unlock()
         
     def poll(self):
-        with QMutexLocker(self.data_mutex):
-            new_process_variable = self.get_process_variable()
-            if not new_process_variable:
+        new_process_variable = self.get_process_variable()
+        new_setpoint = self.get_setpoint()
+        new_rate_limit = self.get_rate_limit()
+
+        if new_setpoint is not None:
+            self.setpoint = new_setpoint
+            self.setpoint_changed.emit(new_setpoint)
+
+        if new_rate_limit is not None:
+            self.rate_limit_changed.emit(new_rate_limit)
+
+            # For initialization
+            self.data_mutex.lock()
+            if self.rate_limit == -1:
+                self.rate_limit = new_rate_limit
+            self.data_mutex.unlock()
+
+        if new_process_variable is None:
+            return
+        
+        self.process_variable_changed.emit(new_process_variable)
+        logger.debug(new_process_variable)
+        
+        self.data_mutex.lock()
+        logger.debug(f"{self.safe_rate_limit} {self.safe_rate_limit_from} {self.safe_rate_limit_to}")
+        safe_rate, safe_from, safe_to = self.safe_rate_limit, self.safe_rate_limit_from, self.safe_rate_limit_to
+        rate_limit = self.rate_limit
+        self.data_mutex.unlock()
+
+
+        if any(x <= 0.0 for x in (safe_rate, safe_from, safe_to)):
+            if safe_from < new_process_variable < safe_to:
+                self.set_rate_limit(safe_rate)
                 return
             
-            self.process_variable_changed.emit(self.new_process_variable)
-            
-            if self.safe_rate_limit_from < new_process_variable < self.safe_rate_limit_to:
-                self.rate_limit_changed.emit(self.safe_rate_limit)
-                self.set_rate_limit(self.safe_rate_limit)
-            
-            elif self.rate_limit == self.safe_rate_limit:
-                self.rate_limit_changed.emit(self.rate_limit)
-                self.set_rate_limit(self.rate_limit)
+        self.set_rate_limit(rate_limit)
         
             
     def get_name(self) -> str:
-        with QMutexLocker(self.data_mutex):
-            return self.name
+        self.data_mutex.lock()
+        name = self.name
+        self.data_mutex.unlock()
         
-    def get_process_variable(self) -> float:
-        return self.read_data("process_variable", count=2)
+        return name
+        
+    def get_process_variable(self) -> float | None:
+        value = self.read_data("process_variable", count=2)
+        return value
     
     def get_setpoint(self) -> float:
         return self.read_data("setpoint", count=2)
@@ -153,8 +198,11 @@ class Source(QObject):
         """
         Returns safe_rate_limit, safe_rate_limit_from, and safe_rate_limit_to as tuple
         """
-        with QMutexLocker(self.data_mutex):
-            return (self.safe_rate_limit, self.safe_rate_limit_from, self.safe_rate_limit_to)
+        self.data_mutex.lock()
+        safe_rate, safe_from, safe_to = self.safe_rate_limit, self.safe_rate_limit_from, self.safe_rate_limit_to
+        self.data_mutex.unlock()
+        
+        return (safe_rate, safe_from, safe_to)
     
     def get_pid(self) -> tuple[float, float, float]:
         """
@@ -166,58 +214,70 @@ class Source(QObject):
         
         # If any failed to read
         if None in (pid_pb, pid_ti, pid_td):
+            self.data_mutex.lock()
             logger.debug(f"Failed to retrieve a pid value for {self.name}")
+            self.data_mutex.unlock()
+            
             return (0.0, 0.0, 0.0)
         
         return (pid_pb, pid_ti, pid_td)
         
     def get_max_process_variable(self):
-        with QMutexLocker(self.data_mutex):
-            # TODO: Add real read here
-            return 0   
+        # TODO: Add real read here
+        return 0   
 
     def set_setpoint(self, setpoint):
-        with QMutexLocker(self.data_mutex):
-            logger.debug(f"Setting setpoint to {setpoint} for source id {self.id}, {self.name}")
-            self.write_data("setpoint", setpoint)
-            self.setpoint = setpoint
-            self.setpoint_changed.emit(self.setpoint)
+        self.data_mutex.lock()
+        logger.debug(f"Setting setpoint to {setpoint} for source id {self.id}, {self.name}")
+        self.data_mutex.unlock()
+        
+        self.write_data("setpoint", setpoint)
+
+        self.data_mutex.lock()
+        self.setpoint = setpoint
+        self.setpoint_changed.emit(self.setpoint)
+        self.data_mutex.unlock()
 
     def set_rate_limit(self, rate_limit):
-        with QMutexLocker(self.data_mutex):
-            logger.debug(f"Setting rate_limit to {rate_limit} for source id {self.id}, {self.name}")
-            self.write_data("setpoint_rate_limit", rate_limit)
-            self.rate_limit = rate_limit
-            self.rate_limit_changed.emit(self.rate_limit)
+        self.data_mutex.lock()
+        logger.debug(f"Setting rate_limit to {rate_limit} for source id {self.id}, {self.name}")
+        self.data_mutex.unlock()
+
+        self.write_data("setpoint_rate_limit", rate_limit)
+
+        self.data_mutex.lock()
+        self.rate_limit = rate_limit
+        self.data_mutex.unlock()
 
     def set_rate_limit_safety(self, safe_rate_limit, safe_rate_limit_from, safe_rate_limit_to):
-        with QMutexLocker(self.data_mutex):
-            logger.debug(f"""
-                Setting multiple values for source id {self.id}, {self.name}
-                - safe_rate_limit: {safe_rate_limit}
-                - safe_rate_limit_from: {safe_rate_limit_from}
-                - safe_rate_limit_to: {safe_rate_limit_to}
-                """)
-            self.safe_rate_limit = safe_rate_limit
-            self.safe_rate_limit_from = safe_rate_limit_from
-            self.safe_rate_limit_to = safe_rate_limit_to
+        self.data_mutex.lock()
+        logger.debug(f"""
+            Setting multiple values for source id {self.id}, {self.name}
+            - safe_rate_limit: {safe_rate_limit}
+            - safe_rate_limit_from: {safe_rate_limit_from}
+            - safe_rate_limit_to: {safe_rate_limit_to}
+            """)
+        
+        self.safe_rate_limit = safe_rate_limit
+        self.safe_rate_limit_from = safe_rate_limit_from
+        self.safe_rate_limit_to = safe_rate_limit_to
+        self.data_mutex.unlock()
         
     def set_pid(self, pid_pb, pid_ti, pid_td):
-        with QMutexLocker(self.data_mutex):
-            logger.debug(f"""
-                Setting multiple values for source id {self.id}, {self.name}
-                - pid_pb: {pid_pb}
-                - pid_ti: {pid_ti}
-                - pid_td: {pid_td}
-                """)
-            self.write_data("pid_pb", pid_pb)
-            self.write_data("pid_ti", pid_ti)
-            self.write_data("pid_td", pid_td)
+        self.data_mutex.lock()
+        logger.debug(f"""
+            Setting multiple values for source id {self.id}, {self.name}
+            - pid_pb: {pid_pb}
+            - pid_ti: {pid_ti}
+            - pid_td: {pid_td}
+            """)
+        self.write_data("pid_pb", pid_pb)
+        self.write_data("pid_ti", pid_ti)
+        self.write_data("pid_td", pid_td)
+        self.data_mutex.unlock()
             
     def set_max_process_variable(self, value):
-        with QMutexLocker(self.data_mutex):
-            # TODO: Add actual write here
-            pass
+        pass
             
     def is_pv_close_to_sp(self):
         # TODO: Ask if rel_tol would be more appropriate

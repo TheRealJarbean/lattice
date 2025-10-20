@@ -63,7 +63,7 @@ class PressureForm(QWidget):
             if not name or not port:
                 continue
             try:
-                address = int(address_text)
+                address = address_text
             except ValueError:
                 address = 0
             devices.append({

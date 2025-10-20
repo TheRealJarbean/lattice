@@ -1,4 +1,4 @@
-from PySide6.QtCore import QMutex, QObject, Signal, QMutexLocker
+from PySide6.QtCore import QMutex, QObject, Signal, QMutexLocker, Slot
 import time
 import logging
 import serial
@@ -56,7 +56,14 @@ class Shutter(QObject):
         self.send_command(f'/{self.address}e0R')
         self.is_open.emit(False)
 
-    def open(self):
+    @Slot()
+    def open(self, shutter=None):
+        """
+        DO NOT CALL THIS METHOD DIRECTLY FROM MAIN THREAD
+        """
+        if shutter is not self:
+            return
+
         with QMutexLocker(self.data_mutex):
             if not self.enabled:
                 return
@@ -66,7 +73,14 @@ class Shutter(QObject):
         self.send_command(f'/{self.address}e7R')
         self.is_open.emit(True)
 
-    def close(self):
+    @Slot()
+    def close(self, shutter=None):
+        """
+        DO NOT CALL THIS METHOD DIRECTLY FROM MAIN THREAD
+        """
+        if shutter is not self:
+            return
+        
         with QMutexLocker(self.data_mutex):
             if not self.enabled:
                 return

@@ -17,7 +17,7 @@ from PySide6.QtCore import Qt, Signal
 class ColorCircle(QLabel):
     color_changed = Signal(str)
     
-    def __init__(self, color=QColor(0, 0, 0), parent=None):
+    def __init__(self, color: str, parent=None):
         super().__init__(parent)
         self.setFixedSize(24, 24)
         self.color = color

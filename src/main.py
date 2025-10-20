@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QPushButton, QFileDialog, QMessageBox,
     QSpacerItem, QSizePolicy
 )
-from PySide6.QtCore import Qt, QTimer, QMutex, QThread
+from PySide6.QtCore import Qt, QTimer, QMutex, QThread, Signal
 from PySide6.QtGui import QAction, QBrush, QColor
 import pyqtgraph as pg
 import numpy as np
@@ -75,6 +75,9 @@ class ScientificAxis(pg.AxisItem):
         return [f"{v:.2e}" for v in values]
 
 class MainWindow(uiclass, baseclass):
+    open_shutter = Signal(Shutter)
+    close_shutter = Signal(Shutter)
+
     def __init__(self):
         super().__init__()
         self.setupUi(self)
@@ -91,18 +94,16 @@ class MainWindow(uiclass, baseclass):
         for pressure_config in hardware_config['devices']['pressure'].values():
             ser = serial.Serial(
                 port=pressure_config['serial']['port'], 
-                baudrate=pressure_config['serial']['baudrate']
+                baudrate=pressure_config['serial']['baudrate'],
+                timeout=0.1
                 )
             
             mutex = QMutex()
-            reader = SerialReader(ser, mutex)
-            reader.start()
             
             self.pressure_gauges.extend([Pressure(
                 name=gauge['name'], 
                 address=gauge['address'],
-                ser=ser, 
-                ser_reader=reader,
+                ser=ser,
                 serial_mutex=mutex
                 ) for gauge in pressure_config['connections']])
         
@@ -110,13 +111,7 @@ class MainWindow(uiclass, baseclass):
         self.pressure_data = []
         for i, gauge in enumerate(self.pressure_gauges):
             self.pressure_data.append([])
-            gauge.pressure_changed.connect(
-                lambda data, idx=i: self.pressure_data[idx].append((self.time_since_start(), data))
-            )
-        
-        # Start polling for data
-        # for gauge in self.pressure_gauges:
-        #     gauge.start_polling()
+            gauge.pressure_changed.connect(partial(self.on_new_pressure_data, i))
         
         ################
         # SOURCE SETUP #
@@ -131,7 +126,7 @@ class MainWindow(uiclass, baseclass):
             client = ModbusSerialClient(
                 port=source_config['serial']['port'], 
                 baudrate=source_config['serial']['baudrate'],
-                timeout=0.001
+                timeout=0.1
                 )
             mutex = QMutex()
             self.sources.extend([Source(
@@ -142,23 +137,14 @@ class MainWindow(uiclass, baseclass):
                 client=client,
                 serial_mutex=mutex
                 ) for device in source_config['connections']])
-            
-        # mg_bulk and mg_cracker have separate entries for polling power values for some reason,
-        # but they are the same physical unit
-        # This can be replaced with len(self.sources) if that is changed
-        num_unique_sources = 10
-            
-        # Start polling for data
-        # for source in self.sources:
-        #     source.start_polling()
 
         # Initialize source data object
         self.source_data = []
-        for _ in range(num_unique_sources):
+        for _ in range(len(self.sources)):
             self.source_data.append([])
 
         # Connect source process variable changes to data handling
-        for i in range(num_unique_sources):
+        for i in range(len(self.sources)):
             self.sources[i].process_variable_changed.connect(partial(self.on_new_source_data, i))
         
         #################
@@ -174,15 +160,15 @@ class MainWindow(uiclass, baseclass):
                 )
             
             serial_mutex = QMutex()
-            reader = SerialReader(ser, serial_mutex)
-            reader.start()
+            self.shutter_reader = SerialReader(ser, serial_mutex)
+            self.shutter_reader.start()
             
             self.shutters.extend([Shutter(
                 name=shutter['name'], 
                 address=shutter['address'], 
                 ser=ser, 
                 serial_mutex=serial_mutex,
-                ser_reader=reader
+                ser_reader=self.shutter_reader
                 ) for shutter in shutter_config['connections']])
         
         # Create dict for accessing shutters by name
@@ -193,6 +179,8 @@ class MainWindow(uiclass, baseclass):
         # The index of the shutter is baked to the connection in for reference later
         for i, shutter in enumerate(self.shutters):
             shutter.is_open.connect(partial(self.on_shutter_state_change, i))
+            self.open_shutter.connect(shutter.open)
+            self.close_shutter.connect(shutter.close)
         
         self.current_shutter_step = 0
         self.shutter_loop_step_timer = QTimer()
@@ -281,9 +269,8 @@ class MainWindow(uiclass, baseclass):
         # Configure pressure data plot
         self.pressure_graph_widget.plotItem.setAxisItems({'left': ScientificAxis('left')})
         self.pressure_graph_widget.enableAutoRange(axis='x', enable=False)
-        self.pressure_graph_widget.enableAutoRange(axis='y', enable=False)
+        self.pressure_graph_widget.enableAutoRange(axis='y', enable=True)
         self.pressure_graph_widget.setXRange(0, 30)
-        self.pressure_graph_widget.setYRange(-1, 1) # TODO: change this
         self.pressure_curves = [
             self.pressure_graph_widget.plot(pen=pg.mkPen(controls.color, width=2))
             for controls in self.pressure_controls
@@ -304,8 +291,12 @@ class MainWindow(uiclass, baseclass):
         self.source_controls_layout = getattr(self, "source_controls", None)
         self.source_controls: list[SourceControlWidget] = []
     
+        while len(theme_config['source_tab']['colors']) < len(self.sources):
+            theme_config['source_tab']['colors'].append("FFFFFF")
+        
         colors = theme_config['source_tab']['colors']
-        for i in range(num_unique_sources):
+            
+        for i in range(len(self.sources)):
             color = "FFFFFF" # Default color
             if 0 <= i < len(colors):
                 color = colors[i]
@@ -343,14 +334,12 @@ class MainWindow(uiclass, baseclass):
             # TODO: Connect extra display for power depending on mg_bulk and mg_cracker needs
             
         # Configure source data plot
-        self.source_graph_widget.plotItem.setAxisItems({'left': ScientificAxis('left')})
         self.source_graph_widget.enableAutoRange(axis='x', enable=False)
-        self.source_graph_widget.enableAutoRange(axis='y', enable=False)
+        self.source_graph_widget.enableAutoRange(axis='y', enable=True)
         self.source_graph_widget.setXRange(0, 30)
-        self.source_graph_widget.setYRange(-1, 1) # TODO: change this
-        self.source_curves = []
-        for _ in self.source_controls:
-            self.source_curves.append(self.source_graph_widget.plot(pen=pg.mkPen('b', width=2)))
+        self.source_curves: list[pg.PlotCurveItem] = []
+        for controls in self.source_controls:
+            self.source_curves.append(self.source_graph_widget.plot(pen=pg.mkPen(controls.circle.color, width=2)))
         for curve in self.source_curves:
             curve.setClipToView(True)
             
@@ -489,13 +478,21 @@ class MainWindow(uiclass, baseclass):
         for shutter in self.shutters:
             shutter.moveToThread(self.shutter_thread)
         self.shutter_thread.start()
+
+        # Start polling for pressure data
+        for gauge in self.pressure_gauges:
+            gauge.start_polling(500)
+
+        # Start polling for source data
+        for source in self.sources:
+            source.start_polling()
     
     ####################
     # Pressure Methods #
     ####################
     
     def on_new_pressure_data(self, idx, data):
-        self.pressure_data[idx].append((time.monotonic(), data))
+        self.pressure_data[idx].append((time.monotonic() - self.start_time, data))
     
     def update_pressure_plot(self):
         # Update the plot with new full dataset
@@ -526,7 +523,8 @@ class MainWindow(uiclass, baseclass):
     ##################
 
     def on_new_source_data(self, idx, data):
-        self.source_data[idx].append((time.monotonic(), data))
+        logger.debug(f"New source data on {idx}: {data}")
+        self.source_data[idx].append((time.monotonic() - self.start_time, data))
         
     def on_source_setpoint_set_clicked(self, idx):
         setpoint = self.source_controls[idx].input_setpoint.value()
@@ -534,6 +532,7 @@ class MainWindow(uiclass, baseclass):
     
     def on_source_rate_limit_set_clicked(self, idx):
         rate_limit = self.source_controls[idx].input_rate_limit.value()
+        logger.debug(f"VALUE OF BOX {self.source_controls[idx].input_rate_limit.value()}")
         self.sources[idx].set_rate_limit(rate_limit)
     
     def open_pid_input_modal(self, idx):
@@ -610,10 +609,10 @@ class MainWindow(uiclass, baseclass):
         else:
             logger.debug(f"Safe Rate Limit Input {idx} Cancelled")
             
-    def on_source_color_change(self, idx, color):
+    def on_source_color_change(self, idx, color: str):
         logger.debug(f"Changing source {idx} color to {color}")
         
-        # TODO: Update plot line color
+        self.source_curves[idx].setPen(color)
         
         # Save color change to config file
         theme_config['source_tab']['colors'][idx] = color[1:] # Remove leading '#'
@@ -639,9 +638,9 @@ class MainWindow(uiclass, baseclass):
         if time_lock_checkbox.isChecked():
             # Show last time_delta seconds
             if max_time >= time_delta:
-                self.pressure_graph_widget.setXRange(max(0, max_time - time_delta), max_time)
+                self.source_graph_widget.setXRange(max(0, max_time - time_delta), max_time)
             else:
-                self.pressure_graph_widget.setXRange(max(0, max_time - time_delta), time_delta)
+                self.source_graph_widget.setXRange(max(0, max_time - time_delta), time_delta)
         
     ###################
     # SHUTTER METHODS #
@@ -694,9 +693,10 @@ class MainWindow(uiclass, baseclass):
         for i in range(len(self.shutters)):
             shutter_state_widget = getattr(self, f"step_{step}_shutter_state_{i}")
             if shutter_state_widget.text() == "Open":
-                self.shutters[i].open()
+                print("Trying to open!")
+                self.open_shutter.emit(self.shutters[i])
             else:
-                self.shutters[i].close()
+                self.close_shutter.emit(self.shutters[i])
             
         time_input_widget = getattr(self, f"step_time_{step}", None)
         if time_input_widget is None:
@@ -792,10 +792,10 @@ class MainWindow(uiclass, baseclass):
         is_open = button.property('is_open')
         
         if is_open:
-            self.shutters[shutter_idx].close()
+            self.close_shutter.emit(self.shutters[shutter_idx])
             button.setProperty('is_open', False)
         else:
-            self.shutters[shutter_idx].open()
+            self.open_shutter.emit(self.shutters[shutter_idx])
             button.setProperty('is_open', True)
             
     def on_shutter_state_change(self, shutter_idx, is_open):
@@ -1009,9 +1009,9 @@ class MainWindow(uiclass, baseclass):
         if state == "":
             return
         elif state == "OPEN":
-            self.shutter_dict[name].open()
+            self.open_shutter.emit(self.shutter_dict[name])
         else:
-            self.shutter_dict[name].close()
+            self.close_shutter.emit(self.shutter_dict[name])
           
     def recipe_wait_until_setpoint(self, idx, setpoint):
         self.is_recipe_waiting = True
