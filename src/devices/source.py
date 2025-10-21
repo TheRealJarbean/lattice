@@ -3,6 +3,7 @@ from pymodbus.client.serial import ModbusSerialClient as ModbusClient
 from pymodbus.exceptions import ModbusException
 import logging
 import math
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class Source(QObject):
     process_variable_changed = Signal(float)
     working_setpoint_changed = Signal(float)
     setpoint_changed = Signal(float)
+    working_setpoint_changed = Signal(float)
     # This does not always match the value of "rate_limit"
     # Should also emit when the safe rate limit is applied
     # i.e. it should emit whenever the hardware rate limit changes
@@ -65,6 +67,10 @@ class Source(QObject):
         self.client = client
         self.serial_mutex = serial_mutex
         self.data_mutex = QMutex()
+
+        # Stability attributes
+        self.stability_time = None
+        self.is_stable = False
         
         if safety_settings:
             logger.debug(f"""
@@ -76,14 +82,24 @@ class Source(QObject):
             self.safe_rate_limit = safety_settings['rate_limit']
             self.safe_rate_limit_from = safety_settings['from']
             self.safe_rate_limit_to = safety_settings['to']
+            self.max_setpoint = safety_settings['max_setpoint']
+            self.stability_tolerance = safety_settings['stability_tolerance']
         else:
             self.safe_rate_limit = 0.0
             self.safe_rate_limit_from = 0.0
             self.safe_rate_limit_to = 0.0
+            self.max_setpoint = 2000.0
+            self.stability_tolerance = 1.0
             
         # Create and connect poll timer
         self.poll_timer = QTimer()
         self.poll_timer.timeout.connect(self.poll)
+
+        # Create and connect the stability timer
+        self.stability_timer = QTimer()
+        self.stability_timer.timeout.connect(self.check_stability)
+        self.stability_timer.start(500)
+
         
     def read_data(self, key, count=1):
         self.data_mutex.lock()
@@ -141,11 +157,15 @@ class Source(QObject):
     def poll(self):
         new_process_variable = self.get_process_variable()
         new_setpoint = self.get_setpoint()
+        new_working_setpoint = self.get_working_setpoint()
         new_rate_limit = self.get_rate_limit()
 
         if new_setpoint is not None:
             self.setpoint = new_setpoint
             self.setpoint_changed.emit(new_setpoint)
+
+        if new_working_setpoint is not None:
+            self.working_setpoint_changed.emit(new_working_setpoint)
 
         if new_rate_limit is not None:
             self.rate_limit_changed.emit(new_rate_limit)
@@ -190,6 +210,9 @@ class Source(QObject):
     
     def get_setpoint(self) -> float:
         return self.read_data("setpoint", count=2)
+
+    def get_working_setpoint(self) -> float:
+        return self.read_data("working_setpoint", count=2)
     
     def get_rate_limit(self) -> float:
         return self.read_data("setpoint_rate_limit", count=2)
@@ -222,9 +245,17 @@ class Source(QObject):
         
         return (pid_pb, pid_ti, pid_td)
         
-    def get_max_process_variable(self):
-        # TODO: Add real read here
-        return 0   
+    def get_max_setpoint(self):
+        self.data_mutex.lock()
+        max_setpoint = self.max_setpoint
+        self.data_mutex.unlock()
+        return max_setpoint
+    
+    def get_stability_tolerance(self):
+        self.data_mutex.lock()
+        tolerance = self.stability_tolerance
+        self.data_mutex.unlock()
+        return tolerance
 
     def set_setpoint(self, setpoint):
         self.data_mutex.lock()
@@ -276,8 +307,15 @@ class Source(QObject):
         self.write_data("pid_td", pid_td)
         self.data_mutex.unlock()
             
-    def set_max_process_variable(self, value):
-        pass
+    def set_max_setpoint(self, value):
+        self.data_mutex.lock()
+        self.max_setpoint = value
+        self.data_mutex.unlock()
+
+    def set_stability_tolerance(self, value):
+        self.data_mutex.lock()
+        self.stability_tolerance = value
+        self.data_mutex.unlock()
             
     def is_pv_close_to_sp(self):
         # TODO: Ask if rel_tol would be more appropriate
@@ -287,4 +325,17 @@ class Source(QObject):
             logger.error("Could not read sp or pv when comparing sp and pv")
             return
         
-        return math.isclose(current_sp, current_pv, abs_tol=0.5)
+        return math.isclose(current_sp, current_pv, abs_tol=self.stability_tolerance)
+    
+    def check_stability(self):
+        if not self.is_pv_close_to_sp():
+            self.stability_time = None
+            self.is_stable = False
+            return
+        
+        if time.monotonic() - self.stability_time > 5:
+            print(f"{self.name} is stable!")
+            self.is_stable = True
+
+        if self.stability_time is None:
+            self.stability_time = time.monotonic()

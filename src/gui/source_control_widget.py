@@ -1,5 +1,5 @@
 import sys
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, 
     QLabel, 
@@ -9,10 +9,10 @@ from PySide6.QtWidgets import (
     QHBoxLayout, 
     QApplication,
     QDoubleSpinBox,
-    QSizePolicy
+    QSizePolicy,
+    QCheckBox
 )
 from PySide6.QtGui import QColor, QPainter, QBrush, QFont
-from PySide6.QtCore import Qt, Signal
 
 class ColorCircle(QLabel):
     color_changed = Signal(str)
@@ -54,10 +54,9 @@ class SourceControlWidget(QWidget):
         self.set_rate_limit_button = QPushButton("Set")
         self.display_temp = QLineEdit()
         self.display_setpoint = QLineEdit()
+        self.display_working_setpoint = QLineEdit()
+        self.plot_working_setpoint = QCheckBox()
         self.display_rate_limit = QLineEdit()
-        self.display_volts = QLineEdit()
-        self.display_amps = QLineEdit()
-        self.display_watts = QLineEdit()
         self.pid_button = QPushButton("PID")
         self.safety_button = QPushButton("Safety")
         
@@ -65,10 +64,8 @@ class SourceControlWidget(QWidget):
         input_widgets.append(self.input_rate_limit)
         display_widgets.append(self.display_temp)
         display_widgets.append(self.display_setpoint)
+        display_widgets.append(self.display_working_setpoint)
         display_widgets.append(self.display_rate_limit)
-        display_widgets.append(self.display_volts)
-        display_widgets.append(self.display_amps)
-        display_widgets.append(self.display_watts)
         
         # Change widget settings
         self.label.setFixedWidth(100)
@@ -103,20 +100,15 @@ class SourceControlWidget(QWidget):
                 }
             """)
             display.setFont(font)
-            
-        for display in [
-            self.display_temp,
-            self.display_setpoint,
-            self.display_rate_limit
-            ]:
             display.setMinimumWidth(100)
-            
-        for display in [
-            self.display_volts,
-            self.display_amps,
-            self.display_watts
-            ]:
-            display.setFixedWidth(50)
+
+        # Create working setpoint layout
+        wsp_layout = QHBoxLayout()
+        wsp_layout.setSpacing(10)
+        
+        # Add working setpoint widgets to layout
+        wsp_layout.addWidget(self.display_working_setpoint, stretch=1)
+        wsp_layout.addWidget(self.plot_working_setpoint)
         
         # Create layout
         layout = QHBoxLayout()
@@ -132,10 +124,8 @@ class SourceControlWidget(QWidget):
         layout.addWidget(self.set_rate_limit_button)
         layout.addWidget(self.display_temp, stretch=1)
         layout.addWidget(self.display_setpoint, stretch=1)
+        layout.addLayout(wsp_layout, stretch=1)
         layout.addWidget(self.display_rate_limit, stretch=1)
-        layout.addWidget(self.display_volts)
-        layout.addWidget(self.display_amps)
-        layout.addWidget(self.display_watts)
         layout.addWidget(self.pid_button)
         layout.addWidget(self.safety_button)
 
@@ -149,6 +139,7 @@ if __name__ == "__main__":
     widget = SourceControlWidget()
     widget.display_temp.setText("200.00 C")
     widget.display_setpoint.setText("300.00 C")
+    widget.display_working_setpoint.setText("290.00 C")
     widget.display_rate_limit.setText("10.00 C/s")
     layout.addWidget(widget)
     window.setLayout(layout)

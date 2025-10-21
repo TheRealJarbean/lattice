@@ -119,7 +119,9 @@ class MainWindow(uiclass, baseclass):
         
         self.sources: list[Source] = []
         
-        safety_settings = parameter_config['sources']['rate_limit_safety']
+        if parameter_config['sources']['safety'] is None:
+            parameter_config['sources']['safety'] = {}
+        safety_settings = parameter_config['sources']['safety']
         for source_config in hardware_config['devices']['sources'].values():
             logger.debug(source_config)
             logger.debug(source_config['serial']['port'])
@@ -401,6 +403,9 @@ class MainWindow(uiclass, baseclass):
         #########################
         
         self.recipe_table: QTableWidget = getattr(self, "recipe_table", None)
+
+        # Match number of columns to number of sources plus one for action column
+        self.recipe_table.setColumnCount(1 + len(self.sources))
         
         # Configure column resizing: first column fixed, others stretch
         self.recipe_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
@@ -409,7 +414,7 @@ class MainWindow(uiclass, baseclass):
             self.recipe_table.horizontalHeader().setSectionResizeMode(col, QHeaderView.Stretch)
             
         # Label columns with source names
-        column_names = ["Variable"] + [source.get_name() for source in self.sources]
+        column_names = ["Action"] + [source.get_name() for source in self.sources]
         self.recipe_table.setHorizontalHeaderLabels(column_names)
             
         # Center content when editing
@@ -567,9 +572,10 @@ class MainWindow(uiclass, baseclass):
     def open_safe_rate_limit_input_modal(self, idx):
         source = self.sources[idx]
         logger.debug(idx)
-        safe_rate_limit_settings = ["From", "To", "Rate Limit", "Max PV"]
+        safe_rate_limit_settings = ["From", "To", "Rate Limit", "Max Setpoint", "Stability Tolerance"]
         current_values = list(source.get_rate_limit_safety())
-        current_values.append(source.get_max_process_variable())
+        current_values.append(source.get_max_setpoint())
+        current_values.append(source.get_stability_tolerance())
         input_modal = InputModalWidget(
             safe_rate_limit_settings,
             defaults=current_values,
@@ -583,7 +589,8 @@ class MainWindow(uiclass, baseclass):
             safe_rate_limit = values["Rate Limit"]
             safe_from = values["From"]
             safe_to = values["To"]
-            max_pv = values["Max PV"]
+            max_sp = values["Max Setpoint"]
+            stability_tolerance = values['Stability Tolerance']
             
             # Apply changes to source
             source.set_rate_limit_safety(
@@ -591,18 +598,21 @@ class MainWindow(uiclass, baseclass):
                 safe_rate_limit_from=safe_from,
                 safe_rate_limit_to=safe_to
                 )
-            source.set_max_process_variable(max_pv)
+            source.set_max_setpoint(max_sp)
+            source.set_stability_tolerance(stability_tolerance)
             
             # Save changes to config since safety settings are not stored on-device
             # Ensure source entry exists
             logger.debug(parameter_config)
-            if source.name not in parameter_config['sources']['rate_limit_safety']:
-                parameter_config['sources']['rate_limit_safety'][source.name] = {}
+            if source.name not in parameter_config['sources']['safety']:
+                parameter_config['sources']['safety'][source.name] = {}
                 
-            config = parameter_config['sources']['rate_limit_safety'][source.name]
+            config = parameter_config['sources']['safety'][source.name]
             config["from"] = safe_from
             config["to"] = safe_to
             config["rate_limit"] = safe_rate_limit
+            config["max_setpoint"] = max_sp
+            config["stability_tolerance"] = stability_tolerance
             self.write_parameter_config_changes()
         
         # On cancellation
