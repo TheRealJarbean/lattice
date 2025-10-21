@@ -39,6 +39,8 @@ LOG_LEVEL_MAP = {
     "DEBUG": logging.DEBUG,
     "NOTSET": logging.NOTSET,
 }
+# Disable pymodbus logging in favor of own logging
+pymodbus_apply_logging_config(level=logging.CRITICAL)
 
 logging.basicConfig(level=LOG_LEVEL_MAP[LOG_LEVEL])
 logger = logging.getLogger(__name__)
