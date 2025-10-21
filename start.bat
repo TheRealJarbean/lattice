@@ -5,5 +5,4 @@ cd /d "%~dp0"
 
 title GT MBE Control Warnings
 set LOG_LEVEL=WARNING
-call venv\Scripts\activate
-python src\main.py
+venv\Scripts\python.exe src\main.py
