@@ -3,15 +3,13 @@ import time
 import logging
 import serial
 
-# Local imports
-from utils.serial_reader import SerialReader
-
 logger = logging.getLogger(__name__)
 
 class Shutter(QObject):
     is_open = Signal(bool)
+    new_serial_data = Signal(str, str) # Name, data
     
-    def __init__(self, name: str, address: int, ser: serial.Serial, serial_mutex: QMutex, ser_reader: SerialReader):
+    def __init__(self, name: str, address: int, ser: serial.Serial, serial_mutex: QMutex):
         super().__init__()
         self.name = name
         self.address = address
@@ -20,40 +18,52 @@ class Shutter(QObject):
         self.enabled = True
         self.data_mutex = QMutex()
         
-        ser_reader.data_received.connect(self._handle_ser_message)
-        
-    def _handle_ser_message(self, msg: str):
-        # TODO: Implement response handling
-        logger.debug(msg)
-        
     def send_command(self, cmd):
         """Send a message to the serial port."""
         self.serial_mutex.lock()
         if self.ser and self.ser.is_open:
             try:
-                # Add a newline or protocol-specific ending if needed
                 self.ser.write(f"{cmd}\r\n".encode('utf-8'))
-                time.sleep(0.01)
-                logger.debug(f"{self.ser.port} O: {cmd}")
+                
+                self.data_mutex.lock()
+                self.new_serial_data.emit(self.name, f"O: {cmd}")
+                self.data_mutex.unlock()
+                
+                res = self.ser.readline()
+                if res:
+                    message = res.decode('utf-8', errors='ignore').strip()
+                    self.data_mutex.lock()
+                    self.new_serial_data.emit(self.name, f"I: {message}")
+                    self.data_mutex.unlock()
+                    
             except Exception as e:
+                self.data_mutex.lock()
                 logger.error(f"Error in sending serial data on port {self.ser.port}: {e}")
+                self.data_mutex.unlock()
+                
         self.serial_mutex.unlock()
         
     def enable(self):
-        with QMutexLocker(self.data_mutex):
-            self.enabled = True
+        self.data_mutex.lock()
+        self.enabled = True
+        self.data_mutex.unlock()
             
     def disable(self):
-        with QMutexLocker(self.data_mutex):
-            self.enabled = False
+        self.data_mutex.lock()
+        self.enabled = False
+        self.data_mutex.unlock()
 
     def reset(self):
-        with QMutexLocker(self.data_mutex):
-            if not self.enabled:
-                return
+        self.data_mutex.lock()
+        enabled = self.enabled
+        address = self.address
+        self.data_mutex.unlock()
         
-        self.send_command(f'/{self.address}TR')
-        self.send_command(f'/{self.address}e0R')
+        if not enabled:
+            return
+        
+        self.send_command(f'/{address}TR')
+        self.send_command(f'/{address}e0R')
         self.is_open.emit(False)
 
     @Slot()
@@ -64,13 +74,18 @@ class Shutter(QObject):
         if shutter is not self:
             return
 
-        with QMutexLocker(self.data_mutex):
-            if not self.enabled:
-                return
+        self.data_mutex.lock()
+        enabled = self.enabled
+        address = self.address
+        name = self.name
+        self.data_mutex.unlock()
+        
+        if not enabled:
+            return
             
-        logger.debug(f"Opening shutter {self.address} ({self.name})")
-        self.send_command(f'/{self.address}TR')
-        self.send_command(f'/{self.address}e7R')
+        logger.debug(f"Opening shutter {address} ({name})")
+        self.send_command(f'/{address}TR')
+        self.send_command(f'/{address}e7R')
         self.is_open.emit(True)
 
     @Slot()
@@ -81,11 +96,36 @@ class Shutter(QObject):
         if shutter is not self:
             return
         
-        with QMutexLocker(self.data_mutex):
-            if not self.enabled:
-                return
+        self.data_mutex.lock()
+        enabled = self.enabled
+        address = self.address
+        name = self.name
+        self.data_mutex.unlock()
+        
+        if not enabled:
+            return
             
-        logger.debug(f"Closing shutter {self.address} ({self.name})")
-        self.send_command(f'/{self.address}TR')
-        self.send_command(f'/{self.address}e8R')
+        logger.debug(f"Closing shutter {address} ({name})")
+        self.send_command(f'/{address}TR')
+        self.send_command(f'/{address}e8R')
         self.is_open.emit(False)
+        
+    @Slot()
+    def send_custom_command(self, command, shutter=None):
+        """
+        DO NOT CALL THIS METHOD DIRECTLY FROM MAIN THREAD
+        """
+        if shutter is not self:
+            return
+        
+        self.data_mutex.lock()
+        enabled = self.enabled
+        address = self.address
+        name = self.name
+        self.data_mutex.unlock()
+        
+        if not enabled:
+            return
+        
+        logger.debug(f"Sending custom shutter command to {address} ({name}): {command}")
+        self.send_command(f'/{address}{command}')

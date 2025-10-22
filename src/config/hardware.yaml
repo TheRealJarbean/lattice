@@ -2,7 +2,7 @@ devices:
   pressure:
     COM6:
       serial:
-        port: COM6
+        port: null
         baudrate: 9600
       connections:
       - name: Growth Ion
@@ -12,7 +12,7 @@ devices:
   sources:
     COM10:
       serial:
-        port: COM10
+        port: null
         baudrate: 9600
       connections:
       - name: Scandium
@@ -41,7 +41,7 @@ devices:
         address_set: 2604_loop_2
     COM13:
       serial:
-        port: COM13
+        port: null
         baudrate: 9600
       connections:
       - name: Mg Cracker
@@ -50,7 +50,7 @@ devices:
   shutters:
     COM8:
       serial:
-        port: COM8
+        port: null
         baudrate: 9600
       connections:
       - name: Scandium

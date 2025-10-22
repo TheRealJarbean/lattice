@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QPushButton, QFileDialog, QMessageBox,
     QSpacerItem, QSizePolicy
 )
-from PySide6.QtCore import Qt, QTimer, QMutex, QThread, Signal
+from PySide6.QtCore import Qt, QTimer, QMutex, QThread, Signal, Slot
 from PySide6.QtGui import QAction, QBrush, QColor
 import pyqtgraph as pg
 import numpy as np
@@ -16,16 +16,17 @@ import yaml
 import serial
 import csv
 from functools import partial
-from pymodbus.client import ModbusSerialClient
+from pymodbus.client import ModbusSerialClient as ModbusClient
+from pymodbus import pymodbus_apply_logging_config
 
 # Local imports
 from devices.shutter import Shutter
 from devices.source import Source
 from devices.pressure import Pressure
-from utils.serial_reader import SerialReader
 from gui.input_modal_widget import InputModalWidget
 from gui.pressure_control_widget import PressureControlWidget
 from gui.source_control_widget import SourceControlWidget
+from gui.log_widgets import SerialLogWidget, ModbusLogWidget
 
 # Set the log level based on env variable when program is run
 # Determines which logging statements are printed to console
@@ -79,6 +80,7 @@ class ScientificAxis(pg.AxisItem):
 class MainWindow(uiclass, baseclass):
     open_shutter = Signal(Shutter)
     close_shutter = Signal(Shutter)
+    send_shutter_command = Signal(Shutter, str) # Shutter reference, command
 
     def __init__(self):
         super().__init__()
@@ -108,6 +110,9 @@ class MainWindow(uiclass, baseclass):
                 ser=ser,
                 serial_mutex=mutex
                 ) for gauge in pressure_config['connections']])
+            
+        # Create dict for accessing gauges by name
+        self.pressure_gauge_dict = {gauge.name: gauge for gauge in self.pressure_gauges}
         
         # Initialize pressure data object and connect signal
         self.pressure_data = []
@@ -127,7 +132,7 @@ class MainWindow(uiclass, baseclass):
         for source_config in hardware_config['devices']['sources'].values():
             logger.debug(source_config)
             logger.debug(source_config['serial']['port'])
-            client = ModbusSerialClient(
+            client = ModbusClient(
                 port=source_config['serial']['port'], 
                 baudrate=source_config['serial']['baudrate'],
                 timeout=0.1
@@ -141,6 +146,9 @@ class MainWindow(uiclass, baseclass):
                 client=client,
                 serial_mutex=mutex
                 ) for device in source_config['connections']])
+            
+        # Create dict for accessing sources by name
+        self.source_dict = {source.name: source for source in self.sources}
 
         # Initialize source data object
         self.source_data = []
@@ -160,24 +168,22 @@ class MainWindow(uiclass, baseclass):
         for shutter_config in hardware_config['devices']['shutters'].values():
             ser = serial.Serial(
                 port=shutter_config['serial']['port'], 
-                baudrate=shutter_config['serial']['baudrate']
+                baudrate=shutter_config['serial']['baudrate'],
+                timeout=0.1
                 )
             
             serial_mutex = QMutex()
-            self.shutter_reader = SerialReader(ser, serial_mutex)
-            self.shutter_reader.start()
             
             self.shutters.extend([Shutter(
                 name=shutter['name'], 
                 address=shutter['address'], 
                 ser=ser, 
-                serial_mutex=serial_mutex,
-                ser_reader=self.shutter_reader
+                serial_mutex=serial_mutex
                 ) for shutter in shutter_config['connections']])
         
         # Create dict for accessing shutters by name
         self.shutter_dict = {shutter.name: shutter for shutter in self.shutters}
-        
+            
         # The on_shutter_state_change function will handle any gui
         # changes that need to be made based on shutter state
         # The index of the shutter is baked to the connection in for reference later
@@ -185,6 +191,7 @@ class MainWindow(uiclass, baseclass):
             shutter.is_open.connect(partial(self.on_shutter_state_change, i))
             self.open_shutter.connect(shutter.open)
             self.close_shutter.connect(shutter.close)
+            self.send_shutter_command.connect(shutter.send_custom_command)
         
         self.current_shutter_step = 0
         self.shutter_loop_step_timer = QTimer()
@@ -455,6 +462,54 @@ class MainWindow(uiclass, baseclass):
         recipe_new_button = getattr(self, "new_recipe", None)
         recipe_new_button.clicked.connect(self.recipe_reset)
         
+        ##############################
+        # DIAGNOSTICS TAB GUI CONFIG #
+        ##############################
+        
+        # Create serial log widgets
+        serial_log_layout = getattr(self, "serial_log_layout", None)
+        
+        self.pressure_serial_log = SerialLogWidget(
+            app=self,
+            name="Pressure Gauges",
+            device_names=[gauge.name for gauge in self.pressure_gauges]
+        )
+        serial_log_layout.addWidget(self.pressure_serial_log)
+        
+        self.source_serial_log = ModbusLogWidget(
+            app=self,
+            name="Sources",
+            device_names=[source.name for source in self.sources]
+        )
+        serial_log_layout.addWidget(self.source_serial_log)
+        
+        self.shutter_serial_log = SerialLogWidget(
+            app=self,
+            name="Shutters",
+            device_names=[shutter.name for shutter in self.shutters]
+        )
+        serial_log_layout.addWidget(self.shutter_serial_log)
+        
+        # Connect signals
+        for gauge in self.pressure_gauges:
+            gauge.new_serial_data.connect(self.pressure_serial_log.append_data)
+            self.pressure_serial_log.send_command.connect(lambda _, cmd, g=gauge: g.send_custom_command(cmd))
+        
+        self.source_serial_log.read_modbus.connect(
+            lambda name, address: self.source_dict[name].read_data_by_address(address)
+        )
+        self.source_serial_log.write_modbus.connect(
+            lambda name, address, value: self.source_dict[name].write_data_by_address(address, value)
+        )
+        for source in self.sources:
+            source.new_modbus_data.connect(self.source_serial_log.append_data)
+        
+        self.shutter_serial_log.send_command.connect(
+            lambda name, cmd: self.send_shutter_command.emit(self.shutter_dict[name], cmd)
+        )
+        for shutter in self.shutters:
+            shutter.new_serial_data.connect(self.shutter_serial_log.append_data)
+        
         ###################
         # MISC GUI CONFIG #
         ###################
@@ -492,7 +547,7 @@ class MainWindow(uiclass, baseclass):
 
         # Start polling for source data
         for source in self.sources:
-            source.start_polling()
+            source.start_polling(500)
     
     ####################
     # Pressure Methods #
@@ -812,8 +867,10 @@ class MainWindow(uiclass, baseclass):
             
     def on_shutter_state_change(self, shutter_idx, is_open):
         shutter_output_button = getattr(self, f"shutter_output_button_{shutter_idx}")
-        self.toggle_open_close_button(shutter_output_button, not is_open) # Call function as if button was clicked in opposite state
-                
+        
+        # Call function as if button was clicked in opposite state
+        self.toggle_open_close_button(shutter_output_button, not is_open)
+           
     ##################
     # RECIPE METHODS #
     ##################

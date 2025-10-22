@@ -43,13 +43,16 @@ class Source(QObject):
     working_setpoint_changed = Signal(float)
     setpoint_changed = Signal(float)
     working_setpoint_changed = Signal(float)
+    safe_rate_limit_changed = Signal(float)
+    safe_rate_limit_from_changed = Signal(float)
+    safe_rate_limit_to_changed = Signal(float)
+    is_stable_changed = Signal(bool)
+    new_modbus_data = Signal(str, str) # Name, string representation of data
+    
     # This does not always match the value of "rate_limit"
     # Should also emit when the safe rate limit is applied
     # i.e. it should emit whenever the hardware rate limit changes
     rate_limit_changed = Signal(float)
-    safe_rate_limit_changed = Signal(float)
-    safe_rate_limit_from_changed = Signal(float)
-    safe_rate_limit_to_changed = Signal(float)
     
     def __init__(self, name, device_id, address_set, safety_settings: dict, client: ModbusClient, serial_mutex: QMutex):
         super().__init__()
@@ -98,54 +101,69 @@ class Source(QObject):
         # Create and connect the stability timer
         self.stability_timer = QTimer()
         self.stability_timer.timeout.connect(self.check_stability)
-        self.stability_timer.start(500)
+        # self.stability_timer.start(500)
 
         
-    def read_data(self, key, count=1):
+    def read_data_by_address(self, address: int, count=2):
         self.data_mutex.lock()
         self.serial_mutex.lock()
         try:
-            addresses = self.addresses
-            res = self.client.read_holding_registers(address=addresses[key], count=count, device_id=self.id)
+            res = self.client.read_holding_registers(address=address, count=count, device_id=self.id)
 
             if res.isError():
-                logger.warning(f"Modbus response was error when reading {key} from source {self.id}, {self.name}: {res}")
+                logger.warning(f"Modbus response was error when reading address {address} from source {self.id}, {self.name}: {res}")
                 return None
             
             value = self.client.convert_from_registers(res.registers, self.client.DATATYPE.FLOAT32)
+            self.new_modbus_data.emit(self.name, f"Read: {address} | Result: {value}")
 
             return value
         
         except Exception as e:
-            logger.error(f"Error reading {key} from source {self.id}, {self.name}: {e}")
+            logger.error(f"Error reading address {address} from source {self.id}, {self.name}: {e}")
             return None
         
         finally:
             self.serial_mutex.unlock()
             self.data_mutex.unlock()
+            
+    def read_data_by_key(self, key: str, count=2):
+        self.data_mutex.lock()
+        address = self.addresses[key]
+        self.data_mutex.unlock()
         
-    def write_data(self, key, value):
+        return self.read_data_by_address(address, count)
+        
+    def write_data_by_address(self, address: int, value: float):
         self.data_mutex.lock()
         self.serial_mutex.lock()
         try:
-            addresses = self.addresses
             encoded_value = self.client.convert_to_registers(value, self.client.DATATYPE.FLOAT32)
-            res = self.client.write_registers(address=addresses[key], values=encoded_value, device_id=self.id)
+            res = self.client.write_registers(address=address, values=encoded_value, device_id=self.id)
             if res.isError():
-                logger.warning(f"Modbus response was error when writing {key} to source id {self.id}, {self.name}: {res}")
+                logger.warning(f"Modbus response was error when writing address {address} to source id {self.id}, {self.name}: {res}")
+                
+            self.new_modbus_data.emit(self.name, f"Write: {address} | Value: {value}")
         
         except ModbusException as e:
-            logger.error(f"Error writing {key} to source id {self.id}, {self.name}: {e}")
+            logger.error(f"Error writing address {address} to source id {self.id}, {self.name}: {e}")
         
         finally:
             self.data_mutex.unlock()
             self.serial_mutex.unlock()
+            
+    def write_data_by_key(self, key: str, value: float):
+        self.data_mutex.lock()
+        address = self.addresses[key]
+        self.data_mutex.unlock()
         
-    def start_polling(self):
+        return self.write_data_by_address(address, value)
+        
+    def start_polling(self, interval_ms: int):
         self.data_mutex.lock()
         if not self.poll_timer.isActive():
             logger.debug(f"Beginning poll for source {self.name}")
-            self.poll_timer.start(500)
+            self.poll_timer.start(interval_ms)
         self.data_mutex.unlock()
     
     def stop_polling(self):
@@ -205,17 +223,17 @@ class Source(QObject):
         return name
         
     def get_process_variable(self) -> float | None:
-        value = self.read_data("process_variable", count=2)
+        value = self.read_data_by_key("process_variable", count=2)
         return value
     
     def get_setpoint(self) -> float:
-        return self.read_data("setpoint", count=2)
+        return self.read_data_by_key("setpoint", count=2)
 
     def get_working_setpoint(self) -> float:
-        return self.read_data("working_setpoint", count=2)
+        return self.read_data_by_key("working_setpoint", count=2)
     
     def get_rate_limit(self) -> float:
-        return self.read_data("setpoint_rate_limit", count=2)
+        return self.read_data_by_key("setpoint_rate_limit", count=2)
     
     def get_rate_limit_safety(self) -> tuple[float, float, float]:
         """
@@ -231,9 +249,9 @@ class Source(QObject):
         """
         Returns pid_pb, pid_ti, and pid_td as tuple
         """
-        pid_pb = self.read_data("pid_pb", count=2)
-        pid_ti = self.read_data("pid_ti", count=2)
-        pid_td = self.read_data("pid_td", count=2)
+        pid_pb = self.read_data_by_key("pid_pb", count=2)
+        pid_ti = self.read_data_by_key("pid_ti", count=2)
+        pid_td = self.read_data_by_key("pid_td", count=2)
         
         # If any failed to read
         if None in (pid_pb, pid_ti, pid_td):
@@ -262,7 +280,7 @@ class Source(QObject):
         logger.debug(f"Setting setpoint to {setpoint} for source id {self.id}, {self.name}")
         self.data_mutex.unlock()
         
-        self.write_data("setpoint", setpoint)
+        self.write_data_by_key("setpoint", setpoint)
 
         self.data_mutex.lock()
         self.setpoint = setpoint
@@ -274,7 +292,7 @@ class Source(QObject):
         logger.debug(f"Setting rate_limit to {rate_limit} for source id {self.id}, {self.name}")
         self.data_mutex.unlock()
 
-        self.write_data("setpoint_rate_limit", rate_limit)
+        self.write_data_by_key("setpoint_rate_limit", rate_limit)
 
         self.data_mutex.lock()
         self.rate_limit = rate_limit
@@ -302,9 +320,9 @@ class Source(QObject):
             - pid_ti: {pid_ti}
             - pid_td: {pid_td}
             """)
-        self.write_data("pid_pb", pid_pb)
-        self.write_data("pid_ti", pid_ti)
-        self.write_data("pid_td", pid_td)
+        self.write_data_by_key("pid_pb", pid_pb)
+        self.write_data_by_key("pid_ti", pid_ti)
+        self.write_data_by_key("pid_td", pid_td)
         self.data_mutex.unlock()
             
     def set_max_setpoint(self, value):
@@ -331,11 +349,13 @@ class Source(QObject):
         if not self.is_pv_close_to_sp():
             self.stability_time = None
             self.is_stable = False
+            self.is_stable_changed.emit(False)
             return
         
         if time.monotonic() - self.stability_time > 5:
             print(f"{self.name} is stable!")
             self.is_stable = True
+            self.is_stable_changed.emit(True)
 
         if self.stability_time is None:
             self.stability_time = time.monotonic()

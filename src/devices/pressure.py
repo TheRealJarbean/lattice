@@ -4,9 +4,6 @@ import serial
 import re
 import logging
 
-# Local imports
-from utils.serial_reader import SerialReader
-
 logger = logging.getLogger(__name__)
 
 class Pressure(QObject):
@@ -18,6 +15,7 @@ class Pressure(QObject):
     pressure_changed = Signal(float)
     rate_changed = Signal(float)
     is_on_changed = Signal(bool)
+    new_serial_data = Signal(str, str) # Name, data
 
     def __init__(self, name, address, ser: serial.Serial, serial_mutex: QMutex):
         super().__init__()
@@ -40,12 +38,20 @@ class Pressure(QObject):
         self.serial_mutex.lock()
         try:
             if self.ser and self.ser.is_open:
-                # Add a newline or protocol-specific ending if needed
                 self.ser.write(f"{cmd}\r\n".encode('utf-8'))
-                time.sleep(0.01)
+                
+                self.data_mutex.lock()
+                self.new_serial_data.emit(self.name, f"O: {cmd}")
+                self.data_mutex.unlock()
+                
                 response = self.ser.readline()
                 if response:
                     message = response.decode('utf-8', errors='ignore').strip()
+                    
+                    self.data_mutex.lock()
+                    self.new_serial_data.emit(self.name, f"I: {message}")
+                    self.data_mutex.unlock()
+                    
                     message = message[1:] # trim leading >
                     # Scientific notation regex
                     if re.search("^[+\-]?(\d+\.\d*|\d*\.\d+|\d+)([eE][+\-]\d+)?", message):
@@ -103,11 +109,11 @@ class Pressure(QObject):
         self.rate_changed.emit(new_rate)
         self.data_mutex.unlock()
     
-    def start_polling(self, rate_ms: int):
+    def start_polling(self, interval_ms: int):
         self.data_mutex.lock()
         logger.debug(f"Starting polling for gauge {self.name}")
         if not self.poll_timer.isActive():
-            self.poll_timer.start(rate_ms)
+            self.poll_timer.start(interval_ms)
         self.data_mutex.unlock()
     
     def stop_polling(self):
@@ -122,3 +128,12 @@ class Pressure(QObject):
         self.data_mutex.unlock()
 
         self.send_command(f'#0002{address}')
+        
+    def send_custom_command(self, command):
+        self.data_mutex.lock()
+        address = self.address
+        name = self.name
+        self.data_mutex.unlock()
+        
+        logger.debug(f"Sending custom gauge command to {address} ({name}): {command}")
+        self.send_command(f'#{command}{address}')
