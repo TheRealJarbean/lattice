@@ -92,15 +92,10 @@ class Pressure(QObject):
             self.data_mutex.unlock()
 
             self.is_on_changed.emit(False)
-        else:
-            logger.debug(f"Turning on gauge {name}")
-            self.send_command(f'#0031{address}')
-
-            self.data_mutex.lock()
-            self.is_on = True
-            self.data_mutex.unlock()
-
-            self.is_on_changed.emit(True)
+            return
+        
+        logger.debug(f"Turning on gauge {name}")
+        self.send_command(f'#0031{address}')
 
     def update_rate(self):
         self.data_mutex.lock()
