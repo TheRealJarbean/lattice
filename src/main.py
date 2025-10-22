@@ -15,6 +15,7 @@ import os
 import yaml
 import serial
 import csv
+from collections import deque
 from datetime import timedelta
 from functools import partial
 from pymodbus.client import ModbusSerialClient as ModbusClient
@@ -124,7 +125,7 @@ class MainWindow(uiclass, baseclass):
         # Initialize pressure data object and connect signal
         self.pressure_data = []
         for i, gauge in enumerate(self.pressure_gauges):
-            self.pressure_data.append([])
+            self.pressure_data.append(deque(maxlen=21600)) # 3 hours of data at polling rate of 500ms
             gauge.pressure_changed.connect(partial(self.on_new_pressure_data, i))
         
         ################
@@ -158,13 +159,16 @@ class MainWindow(uiclass, baseclass):
         self.source_dict = {source.name: source for source in self.sources}
 
         # Initialize source data object
-        self.source_data = []
+        self.source_process_variable_data = []
+        self.source_working_setpoint_data = []
         for _ in range(len(self.sources)):
-            self.source_data.append([])
+            self.source_process_variable_data.append(deque(maxlen=21600)) # 3 hours of data at default polling rate of 500ms
+            self.source_working_setpoint_data.append(deque(maxlen=21600))
 
-        # Connect source process variable changes to data handling
+        # Connect source process variable and working setpoint changes to data handling
         for i in range(len(self.sources)):
-            self.sources[i].process_variable_changed.connect(partial(self.on_new_source_data, i))
+            self.sources[i].process_variable_changed.connect(partial(self.on_new_source_process_variable, i))
+            self.sources[i].working_setpoint_changed.connect(partial(self.on_new_source_working_setpoint, i))
         
         #################
         # SHUTTER SETUP #
@@ -337,6 +341,11 @@ class MainWindow(uiclass, baseclass):
             controls.set_setpoint_button.clicked.connect(partial(self.on_source_setpoint_set_clicked, i))
             controls.set_rate_limit_button.clicked.connect(partial(self.on_source_rate_limit_set_clicked, i))
             
+            # Connect working setpoint plot checkboxes
+            controls.plot_working_setpoint.stateChanged.connect(
+                lambda state, i=i: self.source_working_setpoint_curves[i].setVisible(bool(state))
+                )
+            
             # Connect variable displays
             self.sources[i].process_variable_changed.connect(
                 lambda pv, c=controls: c.display_temp.setText(f"{pv:.2f} C")
@@ -358,13 +367,23 @@ class MainWindow(uiclass, baseclass):
         self.source_graph_widget.enableAutoRange(axis='x', enable=False)
         self.source_graph_widget.enableAutoRange(axis='y', enable=True)
         self.source_graph_widget.setXRange(0, 30)
-        self.source_curves: list[pg.PlotCurveItem] = []
+        
+        # Create curves
+        self.source_process_variable_curves: list[pg.PlotCurveItem] = []
+        self.source_working_setpoint_curves: list[pg.PlotCurveItem] = []
         for controls in self.source_controls:
-            self.source_curves.append(self.source_graph_widget.plot(pen=pg.mkPen(controls.circle.color, width=2)))
-        for curve in self.source_curves:
+            self.source_process_variable_curves.append(self.source_graph_widget.plot(pen=pg.mkPen(controls.circle.color, width=2)))
+            self.source_working_setpoint_curves.append(self.source_graph_widget.plot(pen=pg.mkPen(controls.circle.color, width=2)))
+        
+        # Clip rendered data to only what is currently visible
+        for curve in self.source_process_variable_curves + self.source_working_setpoint_curves:
             curve.setClipToView(True)
+        
+        # Hide working setpoint curves by default
+        for curve in self.source_working_setpoint_curves:
+            curve.setVisible(False)
             
-        # Start timer to update pressure plot
+        # Start timer to update source data plot
         self.source_plot_update_timer = QTimer()
         self.source_plot_update_timer.timeout.connect(self.update_source_plot)
         self.source_plot_update_timer.start(20)
@@ -595,9 +614,11 @@ class MainWindow(uiclass, baseclass):
     # SOURCE METHODS #
     ##################
 
-    def on_new_source_data(self, idx, data):
-        logger.debug(f"New source data on {idx}: {data}")
-        self.source_data[idx].append((time.monotonic() - self.start_time, data))
+    def on_new_source_process_variable(self, idx, pv):
+        self.source_process_variable_data[idx].append((time.monotonic() - self.start_time, pv))
+        
+    def on_new_source_working_setpoint(self, idx, wsp):
+        self.source_working_setpoint_data[idx].append((time.monotonic() - self.start_time, wsp))
         
     def on_source_setpoint_set_clicked(self, idx):
         setpoint = self.source_controls[idx].input_setpoint.value()
@@ -690,7 +711,7 @@ class MainWindow(uiclass, baseclass):
     def on_source_color_change(self, idx, color: str):
         logger.debug(f"Changing source {idx} color to {color}")
         
-        self.source_curves[idx].setPen(color)
+        self.source_process_variable_curves[idx].setPen(color)
         
         # Save color change to config file
         theme_config['source_tab']['colors'][idx] = color[1:] # Remove leading '#'
@@ -699,12 +720,27 @@ class MainWindow(uiclass, baseclass):
     def update_source_plot(self):
         # Update the plot with new full dataset
         max_time = 0 # To scale x axis later
-        for i in range(len(self.source_data)):
-            if self.source_data[i]:
-                timestamps, values = zip(*self.source_data[i])
+        
+        # Handle process variable data
+        for i in range(len(self.source_process_variable_data)):
+            if self.source_process_variable_data[i]:
+                timestamps, values = zip(*self.source_process_variable_data[i])
                 if timestamps[-1] > max_time:
                     max_time = timestamps[-1]
-                self.source_curves[i].setData(
+                self.source_process_variable_curves[i].setData(
+                    np.array(timestamps),
+                    np.array(values)
+                )
+        
+        # Handle working setpoint data
+        for i in range(len(self.source_working_setpoint_data)):
+            curve = self.source_working_setpoint_curves[i]
+            
+            if curve.isVisible() and self.source_working_setpoint_data[i]:
+                timestamps, values = zip(*self.source_working_setpoint_data[i])
+                if timestamps[-1] > max_time:
+                    max_time = timestamps[-1]
+                curve.setData(
                     np.array(timestamps),
                     np.array(values)
                 )
