@@ -71,13 +71,6 @@ with open(email_alert_config_path, 'r') as f:
 
 uiclass, baseclass = pg.Qt.loadUiType(main_ui_path)
 
-# Misc Constants
-SHUTTER_RECIPE_OPTIONS = [
-    "",
-    "OPEN",
-    "CLOSE"
-]
-
 # Custom axis for scientific notation in plots
 class ScientificAxis(pg.AxisItem):
     def tickStrings(self, values, scale, spacing):
