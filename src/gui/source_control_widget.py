@@ -67,12 +67,14 @@ class SourceControlWidget(QWidget):
         display_widgets.append(self.display_working_setpoint)
         display_widgets.append(self.display_rate_limit)
         
-        # Change widget settings
-        self.label.setFixedWidth(100)
-        
+        # Create font
         font = QFont()
         font.setPointSize(12)
         font.setBold(True)
+        
+        # Change widget settings
+        self.label.setFixedWidth(100)
+        self.label.setFont(font)
         
         for spin_box in input_widgets:
             spin_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
