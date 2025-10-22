@@ -15,6 +15,7 @@ import os
 import yaml
 import serial
 import csv
+from datetime import timedelta
 from functools import partial
 from pymodbus.client import ModbusSerialClient as ModbusClient
 from pymodbus import pymodbus_apply_logging_config
@@ -81,6 +82,11 @@ SHUTTER_RECIPE_OPTIONS = [
 class ScientificAxis(pg.AxisItem):
     def tickStrings(self, values, scale, spacing):
         return [f"{v:.2e}" for v in values]
+    
+# Custom axis for time in plots
+class TimeAxis(pg.AxisItem):
+    def tickStrings(self, values, scale, spacing):
+        return [str(timedelta(seconds=v)) for v in values]
 
 class MainWindow(uiclass, baseclass):
     open_shutter = Signal(Shutter)
@@ -280,7 +286,10 @@ class MainWindow(uiclass, baseclass):
         self.pressure_controls_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
         
         # Configure pressure data plot
-        self.pressure_graph_widget.plotItem.setAxisItems({'left': ScientificAxis('left')})
+        self.pressure_graph_widget.plotItem.setAxisItems({
+            'left': ScientificAxis('left'),
+            'bottom': TimeAxis('bottom')
+            })
         self.pressure_graph_widget.enableAutoRange(axis='x', enable=False)
         self.pressure_graph_widget.enableAutoRange(axis='y', enable=True)
         self.pressure_graph_widget.setXRange(0, 30)
@@ -350,6 +359,7 @@ class MainWindow(uiclass, baseclass):
             # TODO: Connect extra display for power depending on mg_bulk and mg_cracker needs
             
         # Configure source data plot
+        self.source_graph_widget.plotItem.setAxisItems({'bottom': TimeAxis('bottom')})
         self.source_graph_widget.enableAutoRange(axis='x', enable=False)
         self.source_graph_widget.enableAutoRange(axis='y', enable=True)
         self.source_graph_widget.setXRange(0, 30)
