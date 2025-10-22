@@ -27,6 +27,7 @@ from gui.input_modal_widget import InputModalWidget
 from gui.pressure_control_widget import PressureControlWidget
 from gui.source_control_widget import SourceControlWidget
 from gui.log_widgets import SerialLogWidget, ModbusLogWidget
+from utils import recipe
 
 # Set the log level based on env variable when program is run
 # Determines which logging statements are printed to console
@@ -209,30 +210,24 @@ class MainWindow(uiclass, baseclass):
         ################
         
         # Map recipe actions
-        self.recipe_action_map = {
-            "RATE_LIMIT": (lambda idx, rate_limit: self.sources[idx].set_rate_limit(float(rate_limit))),
-            "SHUTTER": (lambda idx, selection_widget: self.recipe_shutter_toggle(idx, selection_widget)),
-            "SETPOINT": (lambda idx, setpoint: self.sources[idx].set_setpoint(float(setpoint))),
-            "WAIT_UNTIL_SETPOINT": (lambda idx, setpoint: self.recipe_wait_until_setpoint(idx, float(setpoint))),
-            "WAIT_FOR_TIME_SECONDS": (lambda _, time: self.recipe_wait_for_time_seconds(int(time)))
+        self.recipe_action_map: dict[str, recipe.RecipeAction] = {
+            "RATE_LIMIT": recipe.RateLimitAction(self.source_dict),
+            "SHUTTER": recipe.ShutterAction(self.shutter_dict),
+            "SETPOINT": recipe.SetpointAction(self.source_dict),
+            "WAIT_UNTIL_SETPOINT": recipe.WaitUntilSetpointAction(self.source_dict),
+            "WAIT_UNTIL_SETPOINT_STABLE": recipe.WaitUntilSetpointStableAction(self.source_dict),
+            "WAIT_FOR_TIME_SECONDS": recipe.WaitForSecondsAction()
         }
         
+        for action in self.recipe_action_map.values():
+            action.can_continue.connect(self._trigger_next_recipe_step)
+        
         self.is_recipe_running = False
-        self.is_recipe_waiting = False
-        self.recipe_pause_status = (False, None) # Store if paused and timer that was running before pause
+        self.is_recipe_paused = False
         self.current_recipe_step = 0
-        self.recipe_resume_step_time_remaining = None
+        self.current_recipe_action = None
         
-        # WAIT_UNTIL_SETPOINT attributes
-        self.check_setpoints_timer = QTimer()
-        self.check_setpoints_timer.timeout.connect(self._recipe_check_setpoints)
-        
-        # WAIT_FOR_TIME_SECONDS attributes
-        self.recipe_wait_timer = QTimer()
-        self.recipe_wait_timer.setSingleShot(True)
-        self.recipe_wait_timer.timeout.connect(self._trigger_next_recipe_step)
-        
-        # Copied rows data attribute
+        # Copied rows data
         self.copied_rows_data = None
 
         ###########################
@@ -334,14 +329,17 @@ class MainWindow(uiclass, baseclass):
             # Connect variable displays
             self.sources[i].process_variable_changed.connect(
                 lambda pv, c=controls: c.display_temp.setText(f"{pv:.2f} C")
-                )
+            )
             self.sources[i].setpoint_changed.connect(
                 lambda sp, c=controls: c.display_setpoint.setText(f"{sp:.2f} C")
-                )
+            )
+            self.sources[i].working_setpoint_changed.connect(
+                lambda wsp, c=controls: c.display_working_setpoint.setText(f"{wsp:.2f} C")
+            )
             self.sources[i].rate_limit_changed.connect(
                 lambda rate, c=controls: c.display_rate_limit.setText(f"{rate:.2f} C/s")
             )
-            # TODO: Connect power display for all sources?
+            
             # TODO: Connect extra display for power depending on mg_bulk and mg_cracker needs
             
         # Configure source data plot
@@ -391,6 +389,7 @@ class MainWindow(uiclass, baseclass):
         for i in range(max_steps):
             for j in range(len(self.shutters)):
                 shutter_state_button = getattr(self, f"step_{i}_shutter_state_{j}")
+                
                 # By default, the button clicked signal passes a boolean "checked" value
                 # the toggle_open_close_button_ui doesn't need this, so we pass a lambda with
                 # an underscore to discard it and pass a reference to the button
@@ -921,10 +920,10 @@ class MainWindow(uiclass, baseclass):
     def add_recipe_action_dropdown(self, row):
         combo = QComboBox()
         combo.addItems(self.recipe_action_map.keys())
-        combo.currentTextChanged.connect(self.recipe_on_action_changed)
+        combo.currentIndexChanged.connect(self.recipe_on_action_changed)
         self.recipe_table.setCellWidget(row, 0, combo)
         
-    def recipe_on_action_changed(self, text):
+    def recipe_on_action_changed(self):
         sender: QComboBox = self.sender()
         sender_row = None
         
@@ -939,16 +938,8 @@ class MainWindow(uiclass, baseclass):
             logger.error("Couldn't find row of action selection")
             return
         
-        if text == "SHUTTER":
-            for col in range(1, self.recipe_table.columnCount()):
-                combo = QComboBox()
-                combo.addItems(SHUTTER_RECIPE_OPTIONS)
-                self.recipe_table.setCellWidget(sender_row, col, combo)
-            return
-        
-        for col in range(1, self.recipe_table.columnCount()):
-            self.recipe_table.removeCellWidget(row, col)
-            self.recipe_table.setItem(row, col, QTableWidgetItem(""))
+        action = sender.currentText()
+        self.recipe_action_map[action].format_row(self.recipe_table, sender_row)
         
     def recipe_insert_row(self, row):
         self.recipe_table.insertRow(row)
@@ -961,78 +952,82 @@ class MainWindow(uiclass, baseclass):
         
     def recipe_toggle_running(self):
         toggle_button: QPushButton = getattr(self, "recipe_start", None)
+        pause_button: QPushButton = getattr(self, "recipe_pause", None)
         self.current_recipe_step = 0
         
         # If recipe is already running
         if self.is_recipe_running:
             self.is_recipe_running = False
-            self.is_recipe_waiting = False
-            self.recipe_pause_status = (False, None)
+            self.is_recipe_paused = False
             
-            # Stop timer for next step if running
-            if self.recipe_wait_timer.isActive():
-                self.recipe_wait_timer.stop()
+            # If current step is a wait action, stop it
+            if isinstance(self.current_recipe_action, recipe.WaitAction):
+                self.current_recipe_action.stop()
+                
+            # Reset current recipe action
+            self.current_recipe_action = None
             
             # Return all rows to white
             for row in range(self.recipe_table.rowCount()):
                 self._style_row(self.recipe_table, row, "#FFFFFF")
             
+            # Reset start recipe button
             toggle_button.setText("Start Recipe")
             toggle_button.setStyleSheet("""
                 background-color: rgb(0, 255, 0);
                 """) 
+            
+            # Reset pause recipe button
+            pause_button.setText("Pause")
+            pause_button.setStyleSheet("""
+                background-color: rgb(255, 255, 0);
+                """)
+            
             self.recipe_table.setEnabled(True)
             return
         
         # If recipe is not running
+        
+        # Disable recipe table editing
         self.recipe_table.setEnabled(False)
+        
+        # Change start button to stop
         toggle_button.setText("Stop Recipe")
         toggle_button.setStyleSheet("""
             background-color: rgb(255, 0, 0);
             """) 
+        
         self.is_recipe_running = True
-        self.recipe_pause_status = (False, None)
         self._trigger_next_recipe_step()
         
-    def _trigger_next_recipe_step(self):
-        self.is_recipe_waiting = False 
+    def _trigger_next_recipe_step(self): 
         step = self.current_recipe_step
         
+        # If recipe is over, toggle recipe off
         if step == (self.recipe_table.rowCount()):
             self.recipe_toggle_running()
             return
         
+        # Style currently running step yellow, previous step green
         self._style_row(self.recipe_table, step, "#FDF586")
         if step != 0:
             self._style_row(self.recipe_table, step - 1, "#75FF75")
         
+        # Get the selected action
         combo_widget = self.recipe_table.cellWidget(step, 0)
         if combo_widget is None:
             logger.warning('No widget found in recipe column 0 row {step}, can be safely ignored on startup')
             return
         selection = combo_widget.currentText()
-        logger.debug(selection)
         
-        for col in range(1, self.recipe_table.columnCount()):
-            # Special exception for shutters
-            # Send the entire dropdown to recipe shutter method
-            widget = self.recipe_table.cellWidget(step, col)
-            if widget and isinstance(widget, QComboBox):
-                self.recipe_action_map[selection](col - 1, widget)
-                continue
-                
-            item = self.recipe_table.item(step, col)
-            value = item.text().strip() if item else ""
-            if value:
-                try:
-                    self.recipe_action_map[selection](col - 1, value)
-                except Exception as e:
-                    logger.error(f"Error in recipe step {step}: {e}")
-        
+        # Increment recipe step
+        # This is done before executing the current action in case it executes
+        # so fast the step number becomes desynced
         self.current_recipe_step += 1
         
-        if not self.is_recipe_waiting:
-            self._trigger_next_recipe_step()
+        # Run current action
+        self.current_recipe_action = self.recipe_action_map[selection]
+        self.current_recipe_action.run(self.recipe_table, step)
             
     def recipe_toggle_pause(self):
         if not self.is_recipe_running:
@@ -1040,69 +1035,44 @@ class MainWindow(uiclass, baseclass):
         
         pause_button: QPushButton = getattr(self, "recipe_pause", None)
         
-        if self.recipe_pause_status[0]:
+        if self.is_recipe_paused:
             logger.debug("Unpausing recipe")
-            if self.recipe_pause_status[1] is self.recipe_wait_timer:
-                self.recipe_wait_timer.start(self.recipe_resume_step_time_remaining)
-            elif self.recipe_pause_status[1] is self.check_setpoints_timer:
-                self.check_setpoints_timer.start(500)
             
-            self.recipe_pause_status = (False, None)
+            # This should always be true
+            if not isinstance(self.current_recipe_action, recipe.WaitAction):
+                logger.error("The current step somehow changed between pausing and resuming.")
+                self.recipe_toggle_running()
+                return
             
+            # Resume current action
+            self.current_recipe_action.resume()
+            
+            # Style pause button
             pause_button.setText("Pause")
             pause_button.setStyleSheet("""
                 background-color: rgb(255, 255, 0);
                 """)
+            
+            self.is_recipe_paused = False
             return
         
-        logger.debug("Pausing recipe")
-        if self.recipe_wait_timer.isActive():
-            self.recipe_resume_step_time_remaining = self.recipe_wait_timer.remainingTimeAsDuration()
-            self.recipe_wait_timer.stop()
-            self.recipe_pause_status = (True, self.recipe_wait_timer)
+        # Check if current action is pausable
+        if not isinstance(self.current_recipe_action, recipe.WaitAction):
+            # This will trigger most commonly when clicking the pause button
+            # just as a wait is ending
+            logger.debug("Step is currently executing, try pausing again on a wait step.")
+            return
         
-        elif self.check_setpoints_timer.isActive():
-            self.check_setpoints_timer.stop()
-            self.recipe_pause_status = (True, self.check_setpoints_timer)
+        # Pause current action
+        self.current_recipe_action.pause()
         
+        # Style resume button
         pause_button.setText("Resume")
         pause_button.setStyleSheet("""
             background-color: rgb(0, 255, 0);
             """)
         
-            
-    def recipe_shutter_toggle(self, idx, selection_widget: QComboBox):
-        name = self.recipe_table.horizontalHeaderItem(idx + 1).text()
-        
-        state = selection_widget.currentText()
-        if state == "":
-            return
-        elif state == "OPEN":
-            self.open_shutter.emit(self.shutter_dict[name])
-        else:
-            self.close_shutter.emit(self.shutter_dict[name])
-          
-    def recipe_wait_until_setpoint(self, idx, setpoint):
-        self.is_recipe_waiting = True
-        self.sources[idx].set_setpoint(setpoint)
-        if not self.check_setpoints_timer.isActive():
-            self.check_setpoints_timer.start(500)
-    
-    def _recipe_check_setpoints(self):
-        if not self.is_recipe_waiting:
-            return # Ensure duplicate triggers don't occur
-        
-        for source in self.sources:
-            if not source.is_pv_close_to_sp():
-                return
-        
-        # Only reached if all source setpoints are near PV
-        self.check_setpoints_timer.stop()
-        self._trigger_next_recipe_step()
-        
-    def recipe_wait_for_time_seconds(self, time):
-        self.is_recipe_waiting = True
-        self.recipe_wait_timer.start(time * 1000)
+        self.is_recipe_paused = True
         
     def recipe_copy_selected_rows(self, selected_rows):
         self.copied_rows_data = []

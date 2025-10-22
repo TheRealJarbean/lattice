@@ -274,6 +274,13 @@ class Source(QObject):
         tolerance = self.stability_tolerance
         self.data_mutex.unlock()
         return tolerance
+    
+    def get_is_stable(self):
+        self.data_mutex.lock()
+        is_stable = self.is_stable
+        self.data_mutex.unlock()
+        
+        return is_stable
 
     def set_setpoint(self, setpoint):
         self.data_mutex.lock()
@@ -336,26 +343,41 @@ class Source(QObject):
         self.data_mutex.unlock()
             
     def is_pv_close_to_sp(self):
-        # TODO: Ask if rel_tol would be more appropriate
         current_sp = self.get_setpoint()
         current_pv = self.get_process_variable()
         if None in [current_sp, current_pv]:
             logger.error("Could not read sp or pv when comparing sp and pv")
             return
         
-        return math.isclose(current_sp, current_pv, abs_tol=self.stability_tolerance)
+        self.data_mutex.lock()
+        tolerance = self.stability_tolerance
+        self.data_mutex.unlock()
+        
+        return math.isclose(current_sp, current_pv, abs_tol=tolerance)
     
     def check_stability(self):
         if not self.is_pv_close_to_sp():
+            self.data_mutex.lock()
             self.stability_time = None
             self.is_stable = False
+            self.data_mutex.unlock()
+            
             self.is_stable_changed.emit(False)
             return
         
-        if time.monotonic() - self.stability_time > 5:
+        self.data_mutex.lock()
+        stability_time = self.stability_time
+        self.data_mutex.unlock()
+        
+        if time.monotonic() - stability_time > 5:
+            self.data_mutex.lock()
             print(f"{self.name} is stable!")
             self.is_stable = True
+            self.data_mutex.unlock()
+            
             self.is_stable_changed.emit(True)
 
-        if self.stability_time is None:
+        if stability_time is None:
+            self.data_mutex.lock()
             self.stability_time = time.monotonic()
+            self.data_mutex.unlock()
