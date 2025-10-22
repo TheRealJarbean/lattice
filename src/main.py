@@ -27,7 +27,7 @@ from gui.input_modal_widget import InputModalWidget
 from gui.pressure_control_widget import PressureControlWidget
 from gui.source_control_widget import SourceControlWidget
 from gui.log_widgets import SerialLogWidget, ModbusLogWidget
-from utils import recipe
+from utils import recipe, EmailAlert
 
 # Set the log level based on env variable when program is run
 # Determines which logging statements are printed to console
@@ -52,6 +52,7 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 hardware_config_path = os.path.join(base_dir, 'config', 'hardware.yaml')
 theme_config_path = os.path.join(base_dir, 'config', 'theme.yaml')
 parameter_config_path = os.path.join(base_dir, 'config', 'parameters.yaml')
+email_alert_config_path = os.path.join(base_dir, 'config', 'alerts.yaml')
 main_ui_path = os.path.join(base_dir, 'gui', 'main.ui')
 
 # Load config files
@@ -63,6 +64,9 @@ with open(theme_config_path, 'r') as f:
     
 with open(parameter_config_path, 'r') as f:
     parameter_config = yaml.safe_load(f)
+    
+with open(email_alert_config_path, 'r') as f:
+    alert_config = yaml.safe_load(f)
 
 uiclass, baseclass = pg.Qt.loadUiType(main_ui_path)
 
@@ -89,6 +93,9 @@ class MainWindow(uiclass, baseclass):
         
         # Set application start time
         self.start_time = time.monotonic()
+        
+        # Configure email alerts
+        self.alert = EmailAlert(alert_config['recipients'])
         
         ##################
         # PRESSURE SETUP #
