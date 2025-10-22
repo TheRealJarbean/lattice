@@ -293,10 +293,12 @@ class MainWindow(uiclass, baseclass):
         self.pressure_graph_widget.enableAutoRange(axis='x', enable=False)
         self.pressure_graph_widget.enableAutoRange(axis='y', enable=True)
         self.pressure_graph_widget.setXRange(0, 30)
+        
         self.pressure_curves = [
             self.pressure_graph_widget.plot(pen=pg.mkPen(controls.color, width=2))
             for controls in self.pressure_controls
         ]
+        
         for curve in self.pressure_curves:
             curve.setClipToView(True)
             
