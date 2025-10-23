@@ -91,6 +91,9 @@ class MainWindow(uiclass, baseclass):
         super().__init__()
         self.setupUi(self)
         
+        # Change default window size
+        self.resize(1400, 900)
+        
         # Set application start time
         self.start_time = time.monotonic()
         
