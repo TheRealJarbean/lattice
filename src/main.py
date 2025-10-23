@@ -29,6 +29,7 @@ from gui.input_modal_widget import InputModalWidget
 from gui.pressure_control_widget import PressureControlWidget
 from gui.source_control_widget import SourceControlWidget
 from gui.log_widgets import SerialLogWidget, ModbusLogWidget
+from gui.shutter_control_widget import ShutterControlWidget
 from utils import recipe, EmailAlert
 
 # Set the log level based on env variable when program is run
@@ -71,6 +72,12 @@ with open(email_alert_config_path, 'r') as f:
     alert_config = yaml.safe_load(f)
 
 uiclass, baseclass = pg.Qt.loadUiType(main_ui_path)
+
+SHUTTER_RECIPE_OPTIONS = (
+    "",
+    "OPEN",
+    "CLOSE"
+)
 
 # Custom axis for scientific notation in plots
 class ScientificAxis(pg.AxisItem):
@@ -125,6 +132,11 @@ class MainWindow(uiclass, baseclass):
         # Create dict for accessing gauges by name
         self.pressure_gauge_dict = {gauge.name: gauge for gauge in self.pressure_gauges}
         
+        # Create thread
+        self.pressure_thread = QThread()
+        for gauge in self.pressure_gauges:
+            gauge.moveToThread(self.pressure_thread)
+        
         # Initialize pressure data object and connect signal
         self.pressure_data = []
         for i, gauge in enumerate(self.pressure_gauges):
@@ -160,6 +172,11 @@ class MainWindow(uiclass, baseclass):
             
         # Create dict for accessing sources by name
         self.source_dict = {source.name: source for source in self.sources}
+        
+        # Create thread
+        self.source_thread = QThread()
+        for source in self.sources:
+            source.moveToThread(self.source_thread)
 
         # Initialize source data object
         self.source_process_variable_data = []
@@ -197,12 +214,17 @@ class MainWindow(uiclass, baseclass):
         
         # Create dict for accessing shutters by name
         self.shutter_dict = {shutter.name: shutter for shutter in self.shutters}
+        
+        # Create thread
+        self.shutter_thread = QThread()
+        for shutter in self.shutters:
+            shutter.moveToThread(self.shutter_thread)
             
         # The on_shutter_state_change function will handle any gui
         # changes that need to be made based on shutter state
         # The index of the shutter is baked to the connection in for reference later
         for i, shutter in enumerate(self.shutters):
-            shutter.is_open.connect(partial(self.on_shutter_state_change, i))
+            shutter.is_open_changed.connect(self.on_shutter_state_change)
             self.open_shutter.connect(shutter.open)
             self.close_shutter.connect(shutter.close)
             self.send_shutter_command.connect(shutter.send_custom_command)
@@ -395,39 +417,32 @@ class MainWindow(uiclass, baseclass):
         # SHUTTER TAB GUI CONFIG  #
         ###########################
         
-        # Set shutter name fields
-        for i in range(len(self.shutters)):
-            shutter_name_label = getattr(self, f"shutter_name_{i}")
-            shutter_name_label.setText(self.shutters[i].name)
+        # Create shutter control widgets
+        shutter_controls_layout = getattr(self, "shutter_controls_layout", None)
+        self.shutter_controls: list[ShutterControlWidget] = []
+        for shutter in self.shutters:
+            widget = ShutterControlWidget(shutter.name, 6)
+            self.shutter_controls.append(widget)
+            shutter_controls_layout.addWidget(widget)
             
-        # Connect shutter enable/disable buttons to logic
-        for i in range(len(self.shutters)):
-            shutter_control_button = getattr(self, f"shutter_control_button_{i}")
-            shutter_control_button.setProperty('shutter_idx', i)
-            shutter_control_button.setProperty('is_on', True)
-            shutter_control_button.clicked.connect(self.on_shutter_control_button_click)
+        # Connect shutter controls displays and buttons
+        for i, controls in enumerate(self.shutter_controls):
+            # Connect control buttons and set property
+            controls.control_button.clicked.connect(self.on_shutter_control_button_click)
+            controls.control_button.setProperty('idx', i)
+            
+            # Connect output buttons and set property
+            controls.output_button.clicked.connect(self.on_shutter_output_button_click)
+            controls.output_button.setProperty('idx', i)
+            
+            # Connect state buttons and set property
+            for button in controls.step_state_buttons:
+                button.clicked.connect(self.on_shutter_step_state_button_clicked)
+                button.setProperty('idx', i)
             
         # Connect shutter disable all button
         shutter_control_off_all_button = getattr(self, "shutter_control_off_all")
         shutter_control_off_all_button.clicked.connect(self.on_shutter_control_off_all_click)
-            
-        # Connect manual shutter control buttons to logic
-        for i in range(len(self.shutters)):
-            shutter_output_button = getattr(self, f"shutter_output_button_{i}")
-            shutter_output_button.setProperty('shutter_idx', i)
-            shutter_output_button.setProperty('is_open', False)
-            shutter_output_button.clicked.connect(self.on_shutter_output_button_click)
-        
-        # Connect loop step shutter state buttons to logic
-        max_steps = 6
-        for i in range(max_steps):
-            for j in range(len(self.shutters)):
-                shutter_state_button = getattr(self, f"step_{i}_shutter_state_{j}")
-                
-                # By default, the button clicked signal passes a boolean "checked" value
-                # the toggle_open_close_button_ui doesn't need this, so we pass a lambda with
-                # an underscore to discard it and pass a reference to the button
-                shutter_state_button.clicked.connect(lambda _, b=shutter_state_button: self.toggle_open_close_button(b))
                 
         # Connect start/stop button to logic
         shutter_loop_toggle_button = getattr(self, "shutter_loop_toggle")
@@ -559,28 +574,17 @@ class MainWindow(uiclass, baseclass):
         # START THREADS #
         #################
         
-        self.pressure_thread = QThread()
-        for gauge in self.pressure_gauges:
-            gauge.moveToThread(self.pressure_thread)
         self.pressure_thread.start()
-        
-        self.source_thread = QThread()
-        for source in self.sources:
-            source.moveToThread(self.source_thread)
         self.source_thread.start()
-        
-        self.shutter_thread = QThread()
-        for shutter in self.shutters:
-            shutter.moveToThread(self.shutter_thread)
         self.shutter_thread.start()
 
         # Start polling for pressure data
-        for gauge in self.pressure_gauges:
-            gauge.start_polling(500)
+        # for gauge in self.pressure_gauges:
+        #     gauge.start_polling(500)
 
-        # Start polling for source data
-        for source in self.sources:
-            source.start_polling(500)
+        # # Start polling for source data
+        # for source in self.sources:
+        #     source.start_polling(500)
     
     ####################
     # Pressure Methods #
@@ -798,30 +802,38 @@ class MainWindow(uiclass, baseclass):
         
     def _trigger_next_shutter_step(self):
         step = self.current_shutter_step
+        
+        # Increment loop count
         if step == 0:
             loop_count_display = getattr(self, "shutter_loop_count", None)
             count = loop_count_display.property("loop_count")
             loop_count_display.setProperty("loop_count", count + 1)
             loop_count_display.setText(f"{count + 1}")
+        
+        # Display current step
         step_display = getattr(self, "shutter_current_step", None)
         step_display.setText(f"{step + 1}") # Match user-facing number, not index
+        
+        # Store step start time
         self.shutter_step_start_time = time.monotonic()
+        
         logger.debug(f"Triggering shutter loop step {step}")
-        for i in range(len(self.shutters)):
-            shutter_state_widget = getattr(self, f"step_{step}_shutter_state_{i}")
-            if shutter_state_widget.text() == "Open":
+        
+        
+        for i, controls in enumerate(self.shutter_controls):
+            is_open = controls.step_state_buttons[step].property("is_open")
+            if is_open:
                 print("Trying to open!")
                 self.open_shutter.emit(self.shutters[i])
             else:
                 self.close_shutter.emit(self.shutters[i])
-            
+        
+        # Display elapsed time for state
         time_input_widget = getattr(self, f"step_time_{step}", None)
-        if time_input_widget is None:
-            # TODO: Handle this error
-            return
         state_time = int(time_input_widget.value() * 1000) # Sec to ms
         logger.debug(f"State time is {state_time}")
         
+        # Increment step and check if max step has been reached
         max_step_input_widget = getattr(self, "max_loop_step", None)
         max_step = max_step_input_widget.value() - 1 # Indexing starts at 0, user-facing count starts at 1
         if self.current_shutter_step < max_step:
@@ -829,6 +841,7 @@ class MainWindow(uiclass, baseclass):
         else:
             self.current_shutter_step = 0
         
+        # Start timer to trigger next step
         if self.shutter_loop_step_timer.isActive():
             self.shutter_loop_step_timer.stop()
         self.shutter_loop_step_timer.start(state_time)
@@ -850,76 +863,83 @@ class MainWindow(uiclass, baseclass):
         loop_timer.setText(f"{0:04.1f} s")
         step_timer.setText(f"{0:04.1f} s")
         
-    def toggle_open_close_button(self, button, is_open=None):
-        if is_open is None:
-            is_open = button.property('is_open')
+    def on_shutter_step_state_button_clicked(self):
+        button = self.sender()
+        is_open = button.property('is_open')
             
         if is_open:
             button.setText("Closed")
             button.setProperty("is_open", False)
-            button.setStyleSheet("""
-                background-color: rgb(255, 0, 0);
-                border: 1px solid black;                     
-            """)
-            return
-        
-        button.setText("Open")
-        button.setProperty("is_open", True)
-        button.setStyleSheet("""
-            background-color: rgb(0, 255, 0);
-            border: 1px solid black;                     
-        """)
-            
-    def on_shutter_control_button_click(self, is_on=None, idx=None):
-        if None in (is_on, idx):
-            button: QPushButton = self.sender()
-            is_on = button.property("is_on")
-            idx = button.property("shutter_idx")
         else:
-            button = getattr(self, f"shutter_control_button_{idx}", None)
+            button.setText("Open")
+            button.setProperty("is_open", True)
         
-        if button is None:
-            return
+        # Refresh button style
+        button.style().unpolish(button)
+        button.style().polish(button)
+        button.update()
+            
+    def on_shutter_control_button_click(self):
+        button: QPushButton = self.sender()
+        is_on = button.property("is_on")
+        idx = button.property("idx")
             
         if is_on:
             button.setText("OFF")
             button.setProperty("is_on", False)
-            button.setStyleSheet("""
-                background-color: rgb(255, 0, 0);
-                border: 1px solid black;                
-            """)
             self.shutters[idx].disable()
-            return
+        else:
+            button.setText("ON")
+            button.setProperty("is_on", True)
+            self.shutters[idx].enable()
         
-        button.setText("ON")
-        button.setProperty("is_on", True)
-        button.setStyleSheet("""
-            background-color: rgb(0, 255, 0);
-            border: 1px solid black;                
-        """)
-        self.shutters[idx].enable()
+        # Refresh button style
+        button.style().unpolish(button)
+        button.style().polish(button)
+        button.update()
     
     def on_shutter_control_off_all_click(self):
-        for i in range(len(self.shutters)):
-            self.on_shutter_control_button_click(True, i)
+        for shutter in self.shutters:
+            shutter.disable()
+            
+        for controls in self.shutter_controls:
+            button = controls.control_button
+            button.setProperty('is_on', False)
+            button.setText("OFF")
+            
+            # Refresh button style
+            button.style().unpolish(button)
+            button.style().polish(button)
+            button.update()
             
     def on_shutter_output_button_click(self):
-        button = self.sender()
-        shutter_idx = button.property('shutter_idx')
-        is_open = button.property('is_open')
-        
-        if is_open:
-            self.close_shutter.emit(self.shutters[shutter_idx])
-            button.setProperty('is_open', False)
-        else:
-            self.open_shutter.emit(self.shutters[shutter_idx])
-            button.setProperty('is_open', True)
+        button: QPushButton = self.sender()
+        is_open = button.property("is_open")
+        idx = button.property("idx")
             
-    def on_shutter_state_change(self, shutter_idx, is_open):
-        shutter_output_button = getattr(self, f"shutter_output_button_{shutter_idx}")
+        if is_open:
+            self.close_shutter.emit(self.shutters[idx])
+        else:
+            self.open_shutter.emit(self.shutters[idx])
+            
+        # Refresh button style
+        button.style().unpolish(button)
+        button.style().polish(button)
+        button.update()
         
-        # Call function as if button was clicked in opposite state
-        self.toggle_open_close_button(shutter_output_button, not is_open)
+    def on_shutter_state_change(self, shutter: Shutter, is_open):
+        for idx, s in enumerate(self.shutters):
+            if s is not shutter:
+                continue
+            
+            button = self.shutter_controls[idx].output_button
+            button.setText("Open" if is_open else "Closed")
+            button.setProperty('is_open', is_open)
+        
+            # Refresh button style
+            button.style().unpolish(button)
+            button.style().polish(button)
+            button.update()
            
     ##################
     # RECIPE METHODS #

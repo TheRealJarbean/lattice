@@ -6,7 +6,7 @@ import serial
 logger = logging.getLogger(__name__)
 
 class Shutter(QObject):
-    is_open = Signal(bool)
+    is_open_changed = Signal(object, bool) # Reference to self, is_open
     new_serial_data = Signal(str, str) # Name, data
     
     def __init__(self, name: str, address: int, ser: serial.Serial, serial_mutex: QMutex):
@@ -64,7 +64,7 @@ class Shutter(QObject):
         
         self.send_command(f'/{address}TR')
         self.send_command(f'/{address}e0R')
-        self.is_open.emit(False)
+        self.is_open_changed.emit(self, False)
 
     @Slot()
     def open(self, shutter=None):
@@ -86,7 +86,7 @@ class Shutter(QObject):
         logger.debug(f"Opening shutter {address} ({name})")
         self.send_command(f'/{address}TR')
         self.send_command(f'/{address}e7R')
-        self.is_open.emit(True)
+        self.is_open_changed.emit(self, True)
 
     @Slot()
     def close(self, shutter=None):
@@ -108,7 +108,7 @@ class Shutter(QObject):
         logger.debug(f"Closing shutter {address} ({name})")
         self.send_command(f'/{address}TR')
         self.send_command(f'/{address}e8R')
-        self.is_open.emit(False)
+        self.is_open_changed.emit(self, False)
         
     @Slot()
     def send_custom_command(self, command, shutter=None):
