@@ -65,7 +65,6 @@ class Source(QObject):
         self.id = device_id
         self.addresses = MODBUS_ADDRESSES[address_set]
         self.working_setpoint = 0.0
-        self.setpoint = 0.0
         self.rate_limit = -1
         self.client = client
         self.serial_mutex = serial_mutex
@@ -179,7 +178,6 @@ class Source(QObject):
         new_rate_limit = self.get_rate_limit()
 
         if new_setpoint is not None:
-            self.setpoint = new_setpoint
             self.setpoint_changed.emit(new_setpoint)
 
         if new_working_setpoint is not None:
@@ -288,11 +286,6 @@ class Source(QObject):
         self.data_mutex.unlock()
         
         self.write_data_by_key("setpoint", setpoint)
-
-        self.data_mutex.lock()
-        self.setpoint = setpoint
-        self.setpoint_changed.emit(self.setpoint)
-        self.data_mutex.unlock()
 
     def set_rate_limit(self, rate_limit):
         self.data_mutex.lock()
