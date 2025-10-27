@@ -286,7 +286,7 @@ class Source(QObject):
         self.data_mutex.unlock()
 
     def _set_rate_limit(self, rate_limit):
-        self.write_data_by_key("setpoint_rate_limit", rate_limit * 60) # Convert from /s to /min
+        self.write_data_by_key("setpoint_rate_limit", rate_limit)
 
     def set_rate_limit_safety(self, safe_rate_limit, safe_rate_limit_from, safe_rate_limit_to):
         self.data_mutex.lock()

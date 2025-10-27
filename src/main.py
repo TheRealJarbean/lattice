@@ -384,7 +384,7 @@ class MainWindow(uiclass, baseclass):
                 lambda wsp, c=controls: c.display_working_setpoint.setText(f"{wsp:.2f} C")
             )
             self.sources[i].rate_limit_changed.connect(
-                lambda rate, c=controls: c.display_rate_limit.setText(f"{rate/60:.2f} C/s") # Convert form /min to /s
+                lambda rate, c=controls: c.display_rate_limit.setText(f"{rate:.2f} C/s") # Convert form /min to /s
             )
             
             # TODO: Connect extra display for power depending on mg_bulk and mg_cracker needs
