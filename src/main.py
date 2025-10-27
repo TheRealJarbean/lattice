@@ -576,12 +576,12 @@ class MainWindow(uiclass, baseclass):
         self.shutter_thread.start()
 
         # Start polling for pressure data
-        # for gauge in self.pressure_gauges:
-        #     gauge.start_polling(500)
+        for gauge in self.pressure_gauges:
+            gauge.start_polling(1000)
 
         # # Start polling for source data
-        # for source in self.sources:
-        #     source.start_polling(500)
+        for source in self.sources:
+            source.start_polling(500)
     
     ####################
     # Pressure Methods #
@@ -675,9 +675,9 @@ class MainWindow(uiclass, baseclass):
             logger.debug(f"PID Input {idx} Cancelled")
     
     def open_safe_rate_limit_input_modal(self, idx):
-        source = self.sources[idx]
+        source: Source = self.sources[idx]
         logger.debug(idx)
-        safe_rate_limit_settings = ["From", "To", "Rate Limit", "Max Setpoint", "Stability Tolerance"]
+        safe_rate_limit_settings = ["Rate Limit", "From", "To", "Max Setpoint", "Stability Tolerance"]
         current_values = list(source.get_rate_limit_safety())
         current_values.append(source.get_max_setpoint())
         current_values.append(source.get_stability_tolerance())
