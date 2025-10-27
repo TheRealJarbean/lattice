@@ -65,7 +65,7 @@ class Source(QObject):
         self.id = device_id
         self.addresses = MODBUS_ADDRESSES[address_set]
         self.working_setpoint = 0.0
-        self.rate_limit = -1
+        self.rate_limit = 1
         self.client = client
         self.serial_mutex = serial_mutex
         self.data_mutex = QMutex()
@@ -196,23 +196,20 @@ class Source(QObject):
             return
         
         self.process_variable_changed.emit(new_process_variable)
-        logger.debug(new_process_variable)
         
         self.data_mutex.lock()
-        logger.debug(f"{self.safe_rate_limit} {self.safe_rate_limit_from} {self.safe_rate_limit_to}")
         safe_rate, safe_from, safe_to = self.safe_rate_limit, self.safe_rate_limit_from, self.safe_rate_limit_to
         rate_limit = self.rate_limit
         self.data_mutex.unlock()
 
 
-        if any(x <= 0.0 for x in (safe_rate, safe_from, safe_to)):
-            if safe_from < new_process_variable < safe_to:
-                self.set_rate_limit(safe_rate)
+        if not any(x <= 0.0 for x in (safe_rate, safe_from, safe_to)):
+            if safe_from < new_working_setpoint < safe_to:
+                self._set_rate_limit(safe_rate)
                 return
             
-        self.set_rate_limit(rate_limit)
+        self._set_rate_limit(rate_limit)
         
-            
     def get_name(self) -> str:
         self.data_mutex.lock()
         name = self.name
@@ -281,22 +278,15 @@ class Source(QObject):
         return is_stable
 
     def set_setpoint(self, setpoint):
-        self.data_mutex.lock()
-        logger.debug(f"Setting setpoint to {setpoint} for source id {self.id}, {self.name}")
-        self.data_mutex.unlock()
-        
         self.write_data_by_key("setpoint", setpoint)
-
+    
     def set_rate_limit(self, rate_limit):
-        self.data_mutex.lock()
-        logger.debug(f"Setting rate_limit to {rate_limit} for source id {self.id}, {self.name}")
-        self.data_mutex.unlock()
-
-        self.write_data_by_key("setpoint_rate_limit", rate_limit)
-
         self.data_mutex.lock()
         self.rate_limit = rate_limit
         self.data_mutex.unlock()
+
+    def _set_rate_limit(self, rate_limit):
+        self.write_data_by_key("setpoint_rate_limit", rate_limit * 60) # Convert from /s to /min
 
     def set_rate_limit_safety(self, safe_rate_limit, safe_rate_limit_from, safe_rate_limit_to):
         self.data_mutex.lock()
@@ -364,7 +354,6 @@ class Source(QObject):
         
         if time.monotonic() - stability_time > 5:
             self.data_mutex.lock()
-            print(f"{self.name} is stable!")
             self.is_stable = True
             self.data_mutex.unlock()
             

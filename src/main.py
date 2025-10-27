@@ -91,6 +91,7 @@ class TimeAxis(pg.AxisItem):
         return [str(timedelta(seconds=v)) for v in values]
 
 class MainWindow(uiclass, baseclass):
+    # Shutter signals
     open_shutter = Signal(Shutter)
     close_shutter = Signal(Shutter)
     send_shutter_command = Signal(Shutter, str) # Shutter reference, command
@@ -245,23 +246,27 @@ class MainWindow(uiclass, baseclass):
         # RECIPE SETUP #
         ################
         
+        # Set recipe attributes
+        self.is_recipe_running = False
+        self.is_recipe_paused = False
+        self.current_recipe_step = 0
+        self.current_recipe_action = None
+
         # Map recipe actions
+        self.loop_action = recipe.LoopAction() # Need a reference for end loop action
         self.recipe_action_map: dict[str, recipe.RecipeAction] = {
             "RATE_LIMIT": recipe.RateLimitAction(self.source_dict),
             "SHUTTER": recipe.ShutterAction(self.shutter_dict),
             "SETPOINT": recipe.SetpointAction(self.source_dict),
             "WAIT_UNTIL_SETPOINT": recipe.WaitUntilSetpointAction(self.source_dict),
             "WAIT_UNTIL_SETPOINT_STABLE": recipe.WaitUntilSetpointStableAction(self.source_dict),
-            "WAIT_FOR_TIME_SECONDS": recipe.WaitForSecondsAction()
+            "WAIT_FOR_TIME_SECONDS": recipe.WaitForSecondsAction(),
+            "LOOP": self.loop_action,
+            "END_LOOP": recipe.EndLoopAction(self.loop_action, lambda step: setattr(self, "current_recipe_step", step))
         }
         
         for action in self.recipe_action_map.values():
             action.can_continue.connect(self._trigger_next_recipe_step)
-        
-        self.is_recipe_running = False
-        self.is_recipe_paused = False
-        self.current_recipe_step = 0
-        self.current_recipe_action = None
         
         # Copied rows data
         self.copied_rows_data = None
@@ -379,7 +384,7 @@ class MainWindow(uiclass, baseclass):
                 lambda wsp, c=controls: c.display_working_setpoint.setText(f"{wsp:.2f} C")
             )
             self.sources[i].rate_limit_changed.connect(
-                lambda rate, c=controls: c.display_rate_limit.setText(f"{rate:.2f} C/s")
+                lambda rate, c=controls: c.display_rate_limit.setText(f"{rate/60:.2f} C/s") # Convert form /min to /s
             )
             
             # TODO: Connect extra display for power depending on mg_bulk and mg_cracker needs
@@ -395,7 +400,7 @@ class MainWindow(uiclass, baseclass):
         self.source_working_setpoint_curves: list[pg.PlotCurveItem] = []
         for controls in self.source_controls:
             self.source_process_variable_curves.append(self.source_graph_widget.plot(pen=pg.mkPen(controls.circle.color, width=2)))
-            self.source_working_setpoint_curves.append(self.source_graph_widget.plot(pen=pg.mkPen(controls.circle.color, width=2)))
+            self.source_working_setpoint_curves.append(self.source_graph_widget.plot(pen=pg.mkPen(controls.circle.color, width=2, style=Qt.DashLine)))
         
         # Clip rendered data to only what is currently visible
         for curve in self.source_process_variable_curves + self.source_working_setpoint_curves:
@@ -677,7 +682,7 @@ class MainWindow(uiclass, baseclass):
     def open_safe_rate_limit_input_modal(self, idx):
         source: Source = self.sources[idx]
         logger.debug(idx)
-        safe_rate_limit_settings = ["Rate Limit", "From", "To", "Max Setpoint", "Stability Tolerance"]
+        safe_rate_limit_settings = ["Rate Limit (C/s)", "From (C)", "To (C)", "Max Setpoint (C)", "Stability Tolerance (C)"]
         current_values = list(source.get_rate_limit_safety())
         current_values.append(source.get_max_setpoint())
         current_values.append(source.get_stability_tolerance())
@@ -691,11 +696,11 @@ class MainWindow(uiclass, baseclass):
         if input_modal.exec():
             values = input_modal.get_values()
             logger.debug(f"Safe Rate Limit Input {idx} Submitted: {values}")
-            safe_rate_limit = values["Rate Limit"]
-            safe_from = values["From"]
-            safe_to = values["To"]
-            max_sp = values["Max Setpoint"]
-            stability_tolerance = values['Stability Tolerance']
+            safe_rate_limit = values[safe_rate_limit_settings[0]]
+            safe_from = values[safe_rate_limit_settings[1]]
+            safe_to = values[safe_rate_limit_settings[2]]
+            max_sp = values[safe_rate_limit_settings[3]]
+            stability_tolerance = values[safe_rate_limit_settings[4]]
             
             # Apply changes to source
             source.set_rate_limit_safety(
@@ -832,7 +837,6 @@ class MainWindow(uiclass, baseclass):
         for i, controls in enumerate(self.shutter_controls):
             is_open = controls.step_state_buttons[step].property("is_open")
             if is_open:
-                print("Trying to open!")
                 self.open_shutter.emit(self.shutters[i])
             else:
                 self.close_shutter.emit(self.shutters[i])
@@ -1070,6 +1074,10 @@ class MainWindow(uiclass, baseclass):
         
         # Disable recipe table editing
         self.recipe_table.setEnabled(False)
+
+        # Override disabled row styling
+        for row in range(self.recipe_table.rowCount()):
+            self._style_row(self.recipe_table, row)
         
         # Change start button to stop
         toggle_button.setText("Stop Recipe")

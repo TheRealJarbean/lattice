@@ -70,5 +70,5 @@ class WaitUntilSetpointAction(WaitAction):
             return
         
         for source_name in self.sources_checking:
-            if self.sources[source_name].is_pv_close_to_sp():
+            if self.sources[source_name].get_process_variable() > self.sources[source_name].get_setpoint():
                 self.sources_finished.add(source_name)

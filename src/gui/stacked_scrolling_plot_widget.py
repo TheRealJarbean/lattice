@@ -53,6 +53,8 @@ class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
             'left': ScientificAxis('left'),
             'bottom': TimeAxis('bottom')
         })
+        self.combined_plot.setClipToView(True)
+        self.combined_plot.setAutoVisible(x=True, y=True)
         
         # Create stacked plots and add to layout with delimiters
         self.stacked_plots = []
@@ -70,6 +72,7 @@ class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
         # Change stacked plot settings
         for i, plot in enumerate(self.stacked_plots):
             plot.setClipToView(True)
+            plot.setAutoVisible(x=True, y=True)
             plot.setAxisItems({'left': ScientificAxis('left')})
             
             # Hide and link x axes
@@ -101,6 +104,7 @@ class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
                 self.combined_plot.setXRange(max(0, max_time - time_delta), max_time)
                 self.stacked_plots[0].setXRange(max(0, max_time - time_delta), max_time)
             else:
+                self.combined_plot.setXRange(max(0, max_time - time_delta), time_delta)
                 self.stacked_plots[0].setXRange(max(0, max_time - time_delta), time_delta)
     
     def _update_plot_display(self):
