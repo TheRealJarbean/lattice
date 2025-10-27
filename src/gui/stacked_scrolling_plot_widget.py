@@ -7,27 +7,22 @@ from collections import deque
 
 logger = logging.getLogger(__name__)
 
+# Custom axis for scientific notation in plots
 class ScientificAxis(pg.AxisItem):
     def tickStrings(self, values, scale, spacing):
         return [f"{v:+.2e}" for v in values]
+    
+# Custom axis for time in plots
+class TimeAxis(pg.AxisItem):
+    def tickStrings(self, values, scale, spacing):
+        def format_time(total_seconds):
+            minutes, seconds = divmod(total_seconds, 60)
+            hours, minutes = divmod(minutes, 60)
+            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        
+        return [format_time(int(v)) for v in values]
 
-class HorizontalLineWidget(QGraphicsWidget):
-    def __init__(self, width=1, color='w', parent=None):
-        super().__init__(parent)
-        self.pen = pg.mkPen(color)
-        self.pen.setWidth(width)
-        self.setMinimumHeight(width)
-        self.setPreferredHeight(width)
-        self.setMaximumHeight(width)
-
-    def paint(self, painter: QPainter, option, widget=None):
-        rect = self.boundingRect()
-        y = rect.height() / 2
-        painter.setPen(self.pen)
-        painter.drawLine(rect.left(), y, rect.right(), y)
-
-
-class StackedScrollingPlotWidget(QWidget):
+class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
     def __init__(self, names: list[str], data: list[deque[(float, float)]], colors: list[str]):
         super().__init__()
         
@@ -39,10 +34,6 @@ class StackedScrollingPlotWidget(QWidget):
         self.names = names
         self.data = data
         self.colors = colors
-
-        # Create a GraphicsLayoutWidget
-        self.layout = pg.GraphicsLayoutWidget()
-        row = 0
         
         # Create curves
         self.curves = [
@@ -50,37 +41,45 @@ class StackedScrollingPlotWidget(QWidget):
             for i in range(len(data))
         ]
         
+        # Set starting row
+        row = 0
+        
         # Create combined plot and add to layout
-        self.combined_plot = self.layout.addPlot(row=row, col=0)
+        self.combined_plot = self.addPlot(row=row, col=0)
         row+= 1
         
         # Change combined plot settings
-        self.combined_plot.setAxisItems({'left': ScientificAxis('left')})
+        self.combined_plot.setAxisItems({
+            'left': ScientificAxis('left'),
+            'bottom': TimeAxis('bottom')
+        })
         
         # Create stacked plots and add to layout with delimiters
         self.stacked_plots = []
         self.delimiters = []
-        for _ in self.curves:
-            line = HorizontalLineWidget(width=1, color='w')
-            self.delimiters.append(line)
-            self.layout.addItem(line, row=row, col=0)
+        for i in range(len(self.curves)):
+            self.stacked_plots.append(self.addPlot(row=row, col=0))
             row += 1
             
-            self.stacked_plots.append(self.layout.addPlot(row=row, col=0))
-            row += 1
+        # Add dummy plot to stacked plot for shared x axis
+        self.stacked_x_axis_plot = self.addPlot(row=row, col=0)
+        self.stacked_x_axis_plot.setAxisItems({'bottom': TimeAxis('bottom')})
+        self.stacked_x_axis_plot.hideAxis('left')
+        self.stacked_x_axis_plot.setFixedHeight(20)
             
         # Change stacked plot settings
         for i, plot in enumerate(self.stacked_plots):
-            plot.setAxisItems({'left': ScientificAxis('left')})
             plot.setClipToView(True)
-            plot.showAxis('bottom', show=(i == len(self.stacked_plots) - 1))
+            plot.setAxisItems({'left': ScientificAxis('left')})
             
-            if i > 0:
-                # Link X axes
-                plot.setXLink(self.stacked_plots[0])
+            # Hide and link x axes
+            plot.getAxis('bottom').setTicks([])
+            plot.getAxis('bottom').setStyle(showValues=False)
+            plot.setXLink(self.stacked_x_axis_plot)
         
         # Show combined by default
-        self.show_combined()
+        self.is_stacked = True
+        self._update_plot_display()
         
     def update_data(self, time_delta: int = None):
         # Update the plot with new full dataset
@@ -105,55 +104,55 @@ class StackedScrollingPlotWidget(QWidget):
                 self.stacked_plots[0].setXRange(max(0, max_time - time_delta), time_delta)
     
     def _update_plot_display(self):
-        # Show stacked
-        if self.is_stacked:
-            self.combined_plot.hide()
+        # Set visibility of combined plot
+        self.combined_plot.setVisible(not self.is_stacked)
         
-            for i in range(len(self.stacked_plots)):
-                self.stacked_plots[i].show()
-                self.delimiters[i].show()
-                
-            # Add curves to stacked plots
+        # Set visiblity of stacked plots
+        for plot in self.stacked_plots:
+            plot.setVisible(self.is_stacked)
+            
+        # Set visibility of stacked x axis plot
+        self.stacked_x_axis_plot.setVisible(self.is_stacked)
+        
+        # Assign curves to visible plot(s)
+        if self.is_stacked:
             for i, curve in enumerate(self.curves):
                 self.combined_plot.removeItem(curve)
                 self.stacked_plots[i].addItem(curve)
-                
             return
         
-        # Show combined
-        self.combined_plot.show()
-        
-        for i in range(len(self.stacked_plots)):
-            self.stacked_plots[i].hide()
-            self.delimiters[i].hide()
-            
-        # Add curves to combined plot
         for i, curve in enumerate(self.curves):
             self.stacked_plots[i].removeItem(curve)
             self.combined_plot.addItem(curve)
     
     def show_stacked(self):
+        if self.is_stacked:
+            return
+        
         self.is_stacked = True
         self._update_plot_display()
         
     def show_combined(self):
+        if not self.is_stacked:
+            return
+        
         self.is_stacked = False
         self._update_plot_display()
         
-        
-        
-
 if __name__ == '__main__':
     """
     AI GENERATED CODE WARNING
+    Just a simple app with random data for testing
     """
     
     import sys
     from PySide6.QtWidgets import (
-        QApplication, QVBoxLayout, QPushButton, QWidget, QHBoxLayout
+        QApplication, QVBoxLayout, QPushButton, QWidget, QHBoxLayout, QLineEdit, QLabel
     )
     from PySide6.QtCore import QTimer
     import random
+    import time
+    from collections import deque
 
     app = QApplication(sys.argv)
 
@@ -170,7 +169,7 @@ if __name__ == '__main__':
     # Create instance of your plotting widget
     plot_widget = StackedScrollingPlotWidget(names, data, colors)
     plot_widget.show_combined()  # start in combined mode
-    main_layout.addWidget(plot_widget.layout)
+    main_layout.addWidget(plot_widget)
 
     # ---- Buttons to switch modes ----
     button_layout = QHBoxLayout()
@@ -180,19 +179,32 @@ if __name__ == '__main__':
     button_layout.addWidget(btn_combine)
     main_layout.addLayout(button_layout)
 
+    # ---- Time delta control ----
+    control_layout = QHBoxLayout()
+    control_layout.addWidget(QLabel("Time window (s):"))
+    time_delta_edit = QLineEdit()
+    time_delta_edit.setText("10")  # default value
+    time_delta_edit.setFixedWidth(60)
+    control_layout.addWidget(time_delta_edit)
+    main_layout.addLayout(control_layout)
+
     # ---- Connect buttons ----
     btn_split.clicked.connect(plot_widget.show_stacked)
     btn_combine.clicked.connect(plot_widget.show_combined)
 
     # ---- Data update simulation ----
-    t = 0
+    start_time = time.monotonic()
     def update_data():
-        global t
-        t += 0.1
+        t = time.monotonic() - start_time
+        # Read time_delta from the edit field
+        try:
+            time_delta = float(time_delta_edit.text())
+        except ValueError:
+            time_delta = 10  # fallback to default
         for i in range(n_signals):
             val = random.uniform(-1, 1) * (i + 1)
             data[i].append((t, val))
-        plot_widget.update_data(time_delta=10)
+        plot_widget.update_data(time_delta=time_delta)
 
     timer = QTimer()
     timer.timeout.connect(update_data)

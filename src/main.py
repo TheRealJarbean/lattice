@@ -30,6 +30,7 @@ from gui.pressure_control_widget import PressureControlWidget
 from gui.source_control_widget import SourceControlWidget
 from gui.log_widgets import SerialLogWidget, ModbusLogWidget
 from gui.shutter_control_widget import ShutterControlWidget
+from gui.stacked_scrolling_plot_widget import StackedScrollingPlotWidget
 from utils import recipe, EmailAlert
 
 # Set the log level based on env variable when program is run
@@ -307,27 +308,23 @@ class MainWindow(uiclass, baseclass):
         # Add one last spacer (at this point the layout is | widget | widget ... with no closing spacer)
         self.pressure_controls_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
         
-        # Configure pressure data plot
-        self.pressure_graph_widget.plotItem.setAxisItems({
-            'left': ScientificAxis('left'),
-            'bottom': TimeAxis('bottom')
-            })
-        self.pressure_graph_widget.enableAutoRange(axis='x', enable=False)
-        self.pressure_graph_widget.enableAutoRange(axis='y', enable=True)
-        self.pressure_graph_widget.setXRange(0, 30)
+        # Create pressure data plot
+        self.pressure_plot = StackedScrollingPlotWidget(
+            names=[gauge.name for gauge in self.pressure_gauges],
+            data=self.pressure_data,
+            colors=[controls.color for controls in self.pressure_controls]
+        )
         
-        self.pressure_curves = [
-            self.pressure_graph_widget.plot(pen=pg.mkPen(controls.color, width=2))
-            for controls in self.pressure_controls
-        ]
+        # Add pressure data plot to container
+        pressure_plot_container = getattr(self, "pressure_plot_container", None)
+        pressure_plot_container.addWidget(self.pressure_plot)
         
-        for curve in self.pressure_curves:
-            curve.setClipToView(True)
-            
-        # Start timer to update pressure plot
-        self.pressure_plot_update_timer = QTimer()
-        self.pressure_plot_update_timer.timeout.connect(self.update_pressure_plot)
-        self.pressure_plot_update_timer.start(20)
+        # Connect pressure plot split and combine buttons
+        pressure_plot_split = getattr(self, "pressure_plot_split", None)
+        pressure_plot_combine = getattr(self, "pressure_plot_combine", None)
+        
+        pressure_plot_split.clicked.connect(self.pressure_plot.show_stacked)
+        pressure_plot_combine.clicked.connect(self.pressure_plot.show_combined)
         
         #########################
         # SOURCE TAB GUI CONFIG #
@@ -591,8 +588,20 @@ class MainWindow(uiclass, baseclass):
     ####################
     
     def on_new_pressure_data(self, idx, data):
+        # Store data
         self.pressure_data[idx].append((time.monotonic() - self.start_time, data))
-    
+        
+        # Update plot and constrain x-axis
+        time_lock_checkbox = getattr(self, "pressure_plot_time_lock", None)
+        if time_lock_checkbox.isChecked():
+            time_delta_field = getattr(self, "pressure_plot_time_delta", None)
+            time_delta = time_delta_field.value()
+            self.pressure_plot.update_data(time_delta)
+            return
+        
+        # Don't constrain x-axis
+        self.pressure_plot.update_data()
+        
     def update_pressure_plot(self):
         # Update the plot with new full dataset
         max_time = 0 # To scale x axis later
