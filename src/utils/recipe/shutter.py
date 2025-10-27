@@ -54,11 +54,8 @@ class ShutterAction(RecipeAction):
                 return False
             
             return True
-            
-        
-    def format_row(self, recipe_table: QTableWidget, row: int):
-        for col in range(1, recipe_table.columnCount()):
-            combo = QComboBox()
-            combo.addItems(["", "OPEN", "CLOSE"])
-            recipe_table.setCellWidget(row, col, combo)
-        return
+             
+    def format_cell(self, recipe_table: QTableWidget, col: int, row: int):
+        combo = QComboBox()
+        combo.addItems(["", "OPEN", "CLOSE"])
+        recipe_table.setCellWidget(row, col, combo)
