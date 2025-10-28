@@ -1,3 +1,6 @@
+# Creating Config Files
+If any config files are missing, they will be generated on when the program starts.
+
 # Automatic Config
 The following config files are updated automatically in software:
     - theme.yaml
