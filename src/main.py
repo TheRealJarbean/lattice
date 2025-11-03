@@ -131,6 +131,10 @@ class MainWindow(uiclass, baseclass):
                 serial_mutex=mutex
                 ) for gauge in pressure_config['connections']])
             
+            for gauge in self.pressure_gauges:
+                print(f"Name: {gauge.name}")
+                print(f"Address: {gauge.address}")
+            
         # Create dict for accessing gauges by name
         self.pressure_gauge_dict = {gauge.name: gauge for gauge in self.pressure_gauges}
         
@@ -295,17 +299,16 @@ class MainWindow(uiclass, baseclass):
             controls = PressureControlWidget(gauge.name, color)
             self.pressure_controls.append(controls)
             self.pressure_controls_layout.addWidget(controls)
+            print(i)
             
             # Connect displayed pressure
-            gauge.pressure_changed.connect(lambda pressure, label=controls.pressure_display: label.setText(f"{pressure:.2e}"))
+            gauge.pressure_changed.connect(lambda pressure, i=i: self.pressure_controls[i].pressure_display.setText(f"{pressure:.2e}"))
             
             # Connect rate display
-            gauge.rate_changed.connect(lambda rate, label=controls.rate_display: label.setText(f"{rate:.2f}"))
+            gauge.rate_changed.connect(lambda rate, i=i: self.pressure_controls[i].rate_display.setText(f"{rate:.2f}"))
             
             # Connect on / off button text
-            gauge.is_on_changed.connect(
-                lambda is_on, b=controls.power_toggle_button: b.setText("Turn off" if is_on else "Turn on")
-            )
+            gauge.is_on_changed.connect(lambda is_on, i=i: self.pressure_controls[i].power_toggle_button.setText("Turn off" if is_on else "Turn on"))
             
             # Connect power toggle button action
             controls.power_toggle_button.clicked.connect(gauge.toggle_on_off)
