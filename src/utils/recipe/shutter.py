@@ -1,5 +1,5 @@
 import logging
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, QEvent, QObject
 from PySide6.QtWidgets import QTableWidget, QComboBox
 
 # Local imports
@@ -7,6 +7,15 @@ from .recipe_action import RecipeAction
 from devices.shutter import Shutter
 
 logger = logging.getLogger(__name__)
+
+# Discard scroll wheel events completely
+class WheelEventFilter(QObject):
+    def eventFilter(self, obj, event):
+        # Ignore wheel events
+        if event.type() == QEvent.Wheel:
+            return True  # event handled — stop propagation
+        return super().eventFilter(obj, event)
+WHEEL_FILTER = WheelEventFilter()
 
 # SHUTTER action
 class ShutterAction(RecipeAction):
@@ -57,5 +66,6 @@ class ShutterAction(RecipeAction):
              
     def format_cell(self, recipe_table: QTableWidget, col: int, row: int):
         combo = QComboBox()
+        combo.installEventFilter(WHEEL_FILTER)
         combo.addItems(["", "OPEN", "CLOSE"])
         recipe_table.setCellWidget(row, col, combo)

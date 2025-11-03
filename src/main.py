@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QPushButton, QFileDialog, QMessageBox,
     QSpacerItem, QSizePolicy
 )
-from PySide6.QtCore import Qt, QTimer, QMutex, QThread, Signal, Slot
+from PySide6.QtCore import Qt, QTimer, QMutex, QThread, Signal, QEvent, QObject
 from PySide6.QtGui import QAction, QBrush, QColor
 import pyqtgraph as pg
 import numpy as np
@@ -90,6 +90,15 @@ class TimeAxis(pg.AxisItem):
     def tickStrings(self, values, scale, spacing):
         return [str(timedelta(seconds=v)) for v in values]
 
+# Apply to combo boxes to ignore scrolling, specifically in recipes
+class WheelEventFilter(QObject):
+    def eventFilter(self, obj, event):
+        # Ignore wheel events
+        if event.type() == QEvent.Wheel:
+            return True  # event handled — stop propagation
+        return super().eventFilter(obj, event)
+WHEEL_FILTER = WheelEventFilter()
+
 class MainWindow(uiclass, baseclass):
     # Shutter signals
     open_shutter = Signal(Shutter)
@@ -142,7 +151,7 @@ class MainWindow(uiclass, baseclass):
         # Initialize pressure data object and connect signal
         self.pressure_data = []
         for i, gauge in enumerate(self.pressure_gauges):
-            self.pressure_data.append(deque(maxlen=21600)) # 3 hours of data at polling rate of 500ms
+            self.pressure_data.append(deque(maxlen=7200)) # 3 hours of data at polling rate of 500ms
             gauge.pressure_changed.connect(partial(self.on_new_pressure_data, i))
         
         ################
@@ -184,8 +193,8 @@ class MainWindow(uiclass, baseclass):
         self.source_process_variable_data = []
         self.source_working_setpoint_data = []
         for _ in range(len(self.sources)):
-            self.source_process_variable_data.append(deque(maxlen=21600)) # 3 hours of data at default polling rate of 500ms
-            self.source_working_setpoint_data.append(deque(maxlen=21600))
+            self.source_process_variable_data.append(deque(maxlen=7200)) # 3 hours of data at default polling rate of 500ms
+            self.source_working_setpoint_data.append(deque(maxlen=7200))
 
         # Connect source process variable and working setpoint changes to data handling
         for i in range(len(self.sources)):
@@ -1002,6 +1011,7 @@ class MainWindow(uiclass, baseclass):
     def add_recipe_action_dropdown(self, row):
         combo = QComboBox()
         combo.addItems(self.recipe_action_map.keys())
+        combo.installEventFilter(WHEEL_FILTER)
         combo.currentIndexChanged.connect(self.recipe_on_action_changed)
         self.recipe_table.setCellWidget(row, 0, combo)
         
@@ -1190,6 +1200,7 @@ class MainWindow(uiclass, baseclass):
                 
                 if isinstance(item, QComboBox):
                     new_widget = QComboBox()
+                    new_widget.installEventFilter(WHEEL_FILTER)
                     # Copy items
                     for j in range(item.count()):
                         new_widget.addItem(item.itemText(j))
@@ -1308,6 +1319,7 @@ class MainWindow(uiclass, baseclass):
                         return
                     
                     combo = QComboBox()
+                    combo.installEventFilter(WHEEL_FILTER)
                     combo.addItems(actions)
                     selected_action_idx = actions.index(cell_text)
                     combo.setCurrentIndex(selected_action_idx)
@@ -1330,6 +1342,7 @@ class MainWindow(uiclass, baseclass):
                         return
                     
                     combo = QComboBox()
+                    combo.installEventFilter(WHEEL_FILTER)
                     combo.addItems(SHUTTER_RECIPE_OPTIONS)
                     selected_option = SHUTTER_RECIPE_OPTIONS.index(cell_text)
                     combo.setCurrentIndex(selected_option)
