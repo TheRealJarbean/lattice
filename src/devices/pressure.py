@@ -116,6 +116,10 @@ class Pressure(QObject):
         address = self.address
         self.data_mutex.unlock()
 
+        # Command sent multiple times to force clear device buffer
+        self.send_command(f'#0002{address}')
+        self.send_command(f'#0002{address}')
+        self.send_command(f'#0002{address}')
         res = self.send_command(f'#0002{address}')
         self.data_mutex.lock()
         self.new_serial_data.emit(self.name, f"I: {res}")
