@@ -38,7 +38,6 @@ class Pressure(QObject):
         self.serial_mutex.lock()
         try:
             if self.ser and self.ser.is_open:
-                print(f"Sending command {cmd}")
                 self.ser.write(f"{cmd}\r\n".encode('utf-8'))
                 
                 self.data_mutex.lock()

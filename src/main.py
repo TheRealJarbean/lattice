@@ -131,10 +131,6 @@ class MainWindow(uiclass, baseclass):
                 serial_mutex=mutex
                 ) for gauge in pressure_config['connections']])
             
-            for gauge in self.pressure_gauges:
-                print(f"Name: {gauge.name}")
-                print(f"Address: {gauge.address}")
-            
         # Create dict for accessing gauges by name
         self.pressure_gauge_dict = {gauge.name: gauge for gauge in self.pressure_gauges}
         
@@ -299,7 +295,6 @@ class MainWindow(uiclass, baseclass):
             controls = PressureControlWidget(gauge.name, color)
             self.pressure_controls.append(controls)
             self.pressure_controls_layout.addWidget(controls)
-            print(i)
             
             # Connect displayed pressure
             gauge.pressure_changed.connect(lambda pressure, i=i: self.pressure_controls[i].pressure_display.setText(f"{pressure:.2e}"))
