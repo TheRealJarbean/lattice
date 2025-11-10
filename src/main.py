@@ -60,8 +60,17 @@ email_alert_config_path = os.path.join(base_dir, 'config', 'alerts.yaml')
 main_ui_path = os.path.join(base_dir, 'gui', 'main.ui')
 
 # Load config files
-with open(hardware_config_path, 'r') as f:
-    hardware_config = yaml.safe_load(f)
+if os.path.exists(hardware_config_path):
+    with open(hardware_config_path, 'r') as f:
+        hardware_config = yaml.safe_load(f)
+else:
+    hardware_config = {
+        "devices": {
+            "pressure": "",
+            "sources": "",
+            "shutters": ""
+        }
+    }
     
 with open(theme_config_path, 'r') as f:
     theme_config = yaml.safe_load(f)
@@ -730,7 +739,7 @@ class MainWindow(uiclass, baseclass):
             config["rate_limit"] = safe_rate_limit
             config["max_setpoint"] = max_sp
             config["stability_tolerance"] = stability_tolerance
-            self.write_parameter_config_changes()
+            self.write_config_changes(config, parameter_config_path)
         
         # On cancellation
         else:
@@ -743,7 +752,7 @@ class MainWindow(uiclass, baseclass):
         
         # Save color change to config file
         theme_config['source_tab']['colors'][idx] = color[1:] # Remove leading '#'
-        self.write_theme_config_changes()
+        self.write_config_changes(theme_config, theme_config_path)
 
     def update_source_plot(self):
         # Update the plot with new full dataset
@@ -1369,13 +1378,9 @@ class MainWindow(uiclass, baseclass):
     # MISC METHODS #
     ################
     
-    def write_parameter_config_changes(self):
-        with open(parameter_config_path, 'w') as f:
-            yaml.dump(parameter_config, f, default_flow_style=False)
-    
-    def write_theme_config_changes(self):
-        with open(theme_config_path, "w") as f:
-            yaml.dump(theme_config, f, default_flow_style=False)
+    def write_config_changes(self, config: dict, file_path):
+        with open(file_path, "w") as f:
+            yaml.dump(config, f, default_flow_style=False)
             
     def time_since_start(self):
         return time.monotonic() - self.start_time
