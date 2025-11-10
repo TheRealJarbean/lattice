@@ -47,27 +47,9 @@ class Pressure(QObject):
                 response = self.ser.readline()
                 if response:
                     message = response.decode('utf-8', errors='ignore').strip()
-                    
-                    self.data_mutex.lock()
-                    self.new_serial_data.emit(self.name, f"I: {message}")
-                    self.data_mutex.unlock()
-                    
-                    message = message[1:] # trim leading >
-                    # Scientific notation regex
-                    if re.search("^[+\-]?(\d+\.\d*|\d*\.\d+|\d+)([eE][+\-]\d+)?", message):
-                        try:
-                            value = float(message)
-                            if value > 0:
-                                self.pressure_changed.emit(value)
-
-                                self.data_mutex.lock()
-                                if not self.is_on:
-                                    self.is_on = True
-                                    self.is_on_changed.emit(True)
-                                self.data_mutex.unlock()
-
-                        except Exception as e:
-                            logger.debug(f"Error in converting pressure gauge data to value: {message}")
+                    return message
+                
+                return None
 
         except Exception as e:
             self.data_mutex.lock()
@@ -86,6 +68,8 @@ class Pressure(QObject):
         if is_on:
             logger.debug(f"Turning off gauge {name}")
             self.send_command(f'#0030{address}')
+            self.send_command(f'#0030{address}')
+            self.send_command(f'#0030{address}')
 
             self.data_mutex.lock()
             self.is_on = False
@@ -94,7 +78,14 @@ class Pressure(QObject):
             self.is_on_changed.emit(False)
             return
         
+        self.data_mutex.lock()
+        self.is_on = True
+        self.data_mutex.unlock()
+        
         logger.debug(f"Turning on gauge {name}")
+        self.is_on_changed.emit(True)
+        self.send_command(f'#0031{address}')
+        self.send_command(f'#0031{address}')
         self.send_command(f'#0031{address}')
 
     def update_rate(self):
@@ -118,11 +109,43 @@ class Pressure(QObject):
         self.data_mutex.unlock()
 
     def poll(self):
+        if not self.is_on:
+            return
+        
         self.data_mutex.lock()
         address = self.address
         self.data_mutex.unlock()
 
+        # Command sent multiple times to force clear device buffer
         self.send_command(f'#0002{address}')
+        self.send_command(f'#0002{address}')
+        self.send_command(f'#0002{address}')
+        res = self.send_command(f'#0002{address}')
+        self.data_mutex.lock()
+        self.new_serial_data.emit(self.name, f"I: {res}")
+        self.data_mutex.unlock()
+        
+        res = res[1:] # trim leading >
+        # Scientific notation regex
+        if re.search("^[+\-]?(\d+\.\d*|\d*\.\d+|\d+)([eE][+\-]\d+)?", res):
+            try:
+                value = float(res)
+                self.pressure_changed.emit(value)
+                if value > 0:
+                    self.data_mutex.lock()
+                    if not self.is_on:
+                        self.is_on = True
+                        self.is_on_changed.emit(True)
+                    self.data_mutex.unlock()
+                else:
+                    self.data_mutex.lock()
+                    if not self.is_on:
+                        self.is_on = False
+                        self.is_on_changed.emit(False)
+                    self.data_mutex.unlock()
+
+            except Exception as e:
+                logger.debug(f"Error in converting pressure gauge data to value: {res}")
         
     def send_custom_command(self, command):
         self.data_mutex.lock()

@@ -1,10 +1,7 @@
 .vscode/
 venv/
 recipes/
-
-# Ignore everything in config except for README
-src/config/*
-!src/config/README.md
+*/config/*.yaml
 
 # Everything below this line is generic python boilerplate gitignore
 

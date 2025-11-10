@@ -65,7 +65,7 @@ class Source(QObject):
         self.id = device_id
         self.addresses = MODBUS_ADDRESSES[address_set]
         self.working_setpoint = 0.0
-        self.rate_limit = 1
+        self.rate_limit = 0.1
         self.client = client
         self.serial_mutex = serial_mutex
         self.data_mutex = QMutex()
