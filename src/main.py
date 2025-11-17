@@ -665,30 +665,6 @@ class MainWindow(uiclass, baseclass):
         
         # Don't constrain x-axis
         self.pressure_plot.update_data()
-        
-    def update_pressure_plot(self):
-        # Update the plot with new full dataset
-        max_time = 0 # To scale x axis later
-        for i in range(len(self.pressure_data)):
-            if self.pressure_data[i]:
-                timestamps, values = zip(*self.pressure_data[i])
-                if timestamps[-1] > max_time:
-                    max_time = timestamps[-1]
-                self.pressure_curves[i].setData(
-                    np.array(timestamps),
-                    np.array(values)
-                )
-
-        # Optional: auto-scroll x-axis
-        time_lock_checkbox = getattr(self, "pressure_plot_time_lock", None)
-        time_delta_field = getattr(self, "pressure_plot_time_delta", None)
-        time_delta = time_delta_field.value()
-        if time_lock_checkbox.isChecked():
-            # Show last time_delta seconds
-            if max_time >= time_delta:
-                self.pressure_graph_widget.setXRange(max(0, max_time - time_delta), max_time)
-            else:
-                self.pressure_graph_widget.setXRange(max(0, max_time - time_delta), time_delta)
                 
     ##################
     # SOURCE METHODS #
@@ -865,8 +841,10 @@ class MainWindow(uiclass, baseclass):
         self.source_cursor_line.show()
 
         # Label at top of plot
+        time_str = str(timedelta(seconds=x))
+        time_str = time_str[:time_str.index('.') + 3] # Truncate to two decimals
         (_, _), (ymin, ymax) = target_vb.viewRange()
-        self.source_cursor_label.setText(f"x = {x:.3f}")
+        self.source_cursor_label.setText(f"t = {time_str}")
         self.source_cursor_label.setPos(x, ymax)
         self.source_cursor_label.show()
         
