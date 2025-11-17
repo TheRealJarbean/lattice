@@ -30,7 +30,7 @@ class WaitUntilSetpointAction(WaitAction):
         for source_name, value in values_dict.items():
             if value is not None:
                 self.previous_setpoints[source_name] = self.sources[source_name].get_setpoint()
-                self.target_setpoints[source_name] = value
+                self.target_setpoints[source_name] = float(value)
                 self.sources[source_name].set_setpoint(float(value))
                 self.sources_checking.add(source_name)
         
@@ -76,7 +76,7 @@ class WaitUntilSetpointAction(WaitAction):
         for source_name in self.sources_checking:
             previous = self.previous_setpoints[source_name]
             target = self.target_setpoints[source_name]
-            process_variable = self.sources[source_name]
+            process_variable = self.sources[source_name].get_process_variable()
             
             # Perform sign comparison to check if target has been "passed"
             if (process_variable - target) * (previous - target) < 0:
