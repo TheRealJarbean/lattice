@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QApplication, QMenu, QHeaderView,
     QComboBox, QTableWidgetItem, QTableWidget, 
     QPushButton, QFileDialog, QMessageBox,
-    QSpacerItem, QSizePolicy
+    QSpacerItem, QSizePolicy, QLabel, QLineEdit
 )
 from PySide6.QtCore import Qt, QTimer, QMutex, QThread, Signal, QEvent, QObject
 from PySide6.QtGui import QAction, QBrush, QColor
@@ -108,6 +108,20 @@ class WheelEventFilter(QObject):
         return super().eventFilter(obj, event)
 WHEEL_FILTER = WheelEventFilter()
 
+# Clear focus from focusable widgets when clicking elsewhere on the screen
+class FocusClearingFilter(QObject):
+    def eventFilter(self, obj, event):
+        # On mouse click
+        if event.type() == QEvent.MouseButtonPress:
+            widget = QApplication.widgetAt(event.globalPos())
+            if widget is None or widget.focusPolicy() == Qt.FocusPolicy.NoFocus:
+                focused_widget = QApplication.focusWidget()
+                if focused_widget is not None:
+                    focused_widget.clearFocus()
+                    
+        return super().eventFilter(obj, event)
+CLEAR_FOCUS_FILTER = FocusClearingFilter()
+
 class MainWindow(uiclass, baseclass):
     # Shutter signals
     open_shutter = Signal(Shutter)
@@ -126,6 +140,9 @@ class MainWindow(uiclass, baseclass):
         
         # Configure email alerts
         self.alert = EmailAlert(alert_config['recipients'])
+        
+        # Apply focus clearing filter
+        QApplication.instance().installEventFilter(CLEAR_FOCUS_FILTER)
         
         ##################
         # PRESSURE SETUP #
@@ -426,6 +443,20 @@ class MainWindow(uiclass, baseclass):
         for curve in self.source_working_setpoint_curves:
             curve.setVisible(False)
             
+        # Add cursor tracking line
+        self.source_cursor_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('y', width=1))
+        self.source_cursor_label = pg.TextItem(color="y")
+
+        self.source_graph_widget.plotItem.addItem(self.source_cursor_line, ignoreBounds=True)
+        self.source_graph_widget.plotItem.addItem(self.source_cursor_label, ignoreBounds=True)
+
+        self.source_cursor_line.hide()
+        self.source_cursor_label.hide()
+        
+        # Connect mouse tracking
+        self._last_mouse_scene_pos = None
+        self.source_graph_widget.scene().sigMouseMoved.connect(self._on_source_mouse_moved)
+            
         # Start timer to update source data plot
         self.source_plot_update_timer = QTimer()
         self.source_plot_update_timer.timeout.connect(self.update_source_plot)
@@ -527,6 +558,18 @@ class MainWindow(uiclass, baseclass):
         # Connect new recipe button
         recipe_new_button = getattr(self, "new_recipe", None)
         recipe_new_button.clicked.connect(self.recipe_reset)
+        
+        # Connect time monitor label and data
+        self.recipe_time_monitor_label: QLabel = getattr(self, "recipe_time_monitor_label", None)
+        self.recipe_time_monitor_data: QLineEdit = getattr(self, "recipe_time_monitor_data", None)
+
+        self.recipe_action_map["WAIT_FOR_TIME_SECONDS"].update_monitor_data.connect(self.recipe_time_monitor_data.setText)
+        
+        # Connect loop monitor label and data
+        self.recipe_loop_monitor_label: QLabel = getattr(self, "recipe_loop_monitor_label", None)
+        self.recipe_loop_monitor_data: QLineEdit = getattr(self, "recipe_loop_monitor_data", None)
+
+        self.recipe_action_map["LOOP"].update_monitor_data.connect(self.recipe_loop_monitor_data.setText)
         
         ##############################
         # DIAGNOSTICS TAB GUI CONFIG #
@@ -792,6 +835,40 @@ class MainWindow(uiclass, baseclass):
                 self.source_graph_widget.setXRange(max(0, max_time - time_delta), max_time)
             else:
                 self.source_graph_widget.setXRange(max(0, max_time - time_delta), time_delta)
+            
+            # Update cursor position
+            if self._last_mouse_scene_pos is not None:
+                self._update_source_cursor_from_scene_pos(self._last_mouse_scene_pos)
+                
+    def _on_source_mouse_moved(self, pos):
+        self._last_mouse_scene_pos = pos
+        self._update_source_cursor_from_scene_pos(pos)
+        
+    def _update_source_cursor_from_scene_pos(self, pos):
+        """Track mouse location and show cursor line in the source plot."""
+
+        # Hide everything first
+        self.source_cursor_line.hide()
+        self.source_cursor_label.hide()
+
+        # Check if plot is currently under the mouse
+        if not self.source_graph_widget.plotItem.vb.sceneBoundingRect().contains(pos):
+            return
+
+        target_vb = self.source_graph_widget.plotItem.vb
+        
+        # Convert scene → data coords
+        mouse_point = target_vb.mapSceneToView(pos)
+        x = mouse_point.x()
+
+        self.source_cursor_line.setPos(x)
+        self.source_cursor_line.show()
+
+        # Label at top of plot
+        (_, _), (ymin, ymax) = target_vb.viewRange()
+        self.source_cursor_label.setText(f"x = {x:.3f}")
+        self.source_cursor_label.setPos(x, ymax)
+        self.source_cursor_label.show()
         
     ###################
     # SHUTTER METHODS #
@@ -1083,6 +1160,10 @@ class MainWindow(uiclass, baseclass):
             pause_button.setStyleSheet("""
                 background-color: rgb(255, 255, 0);
                 """)
+            
+            # Clear monitor
+            self.recipe_time_monitor_data.setText("")
+            self.recipe_loop_monitor_data.setText("")
             
             self.recipe_table.setEnabled(True)
             return

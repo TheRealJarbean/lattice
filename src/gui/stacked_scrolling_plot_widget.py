@@ -23,7 +23,7 @@ class TimeAxis(pg.AxisItem):
         return [format_time(int(v)) for v in values]
 
 class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
-    def __init__(self, names: list[str], data: list[deque[(float, float)]], colors: list[str]):
+    def __init__(self, names: list[str], data: list[deque[(float, float)]], colors: list[str], use_scientific=True):
         super().__init__()
         
         if len(colors) < len(data):
@@ -49,8 +49,11 @@ class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
         row+= 1
         
         # Change combined plot settings
+        if use_scientific:
+            self.combined_plot.setAxisItems({
+                'left': ScientificAxis('left'),
+            })
         self.combined_plot.setAxisItems({
-            'left': ScientificAxis('left'),
             'bottom': TimeAxis('bottom')
         })
         self.combined_plot.setClipToView(True)
@@ -73,7 +76,8 @@ class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
         for i, plot in enumerate(self.stacked_plots):
             plot.setClipToView(True)
             plot.setAutoVisible(x=True, y=True)
-            plot.setAxisItems({'left': ScientificAxis('left')})
+            if use_scientific:
+                plot.setAxisItems({'left': ScientificAxis('left')})
             
             # Hide and link x axes
             plot.getAxis('bottom').setTicks([])
@@ -83,6 +87,26 @@ class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
         # Show combined by default
         self.is_stacked = True
         self._update_plot_display()
+        
+        # Create cursor tracking lines and labels
+        self.cursor_lines = []
+        self.cursor_labels = []
+        
+        for plot in [self.combined_plot] + self.stacked_plots:
+            line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('y', width=1))
+            label = pg.TextItem(color="y")
+
+            plot.addItem(line, ignoreBounds=True)
+            plot.addItem(label, ignoreBounds=True)
+
+            line.hide()
+            label.hide()
+
+            self.cursor_lines.append(line)
+            self.cursor_labels.append(label)
+        
+        # Connect mouse tracking
+        self.scene().sigMouseMoved.connect(self._on_mouse_moved)
         
     def update_data(self, time_delta: int = None):
         # Update the plot with new full dataset
@@ -106,6 +130,11 @@ class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
             else:
                 self.combined_plot.setXRange(max(0, max_time - time_delta), time_delta)
                 self.stacked_plots[0].setXRange(max(0, max_time - time_delta), time_delta)
+                
+            # Keep cursor line at last known mouse pos
+            if self._last_mouse_scene_pos is not None:
+                # Update cursor position as if the mouse moved
+                self._update_cursor_from_scene_pos(self._last_mouse_scene_pos)
     
     def _update_plot_display(self):
         # Set visibility of combined plot
@@ -143,6 +172,56 @@ class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
         self.is_stacked = False
         self._update_plot_display()
         
+    def _on_mouse_moved(self, pos):
+        self._last_mouse_scene_pos = pos
+        self._update_cursor_from_scene_pos(pos)
+        
+    def _update_cursor_from_scene_pos(self, pos):
+        """Track mouse location and show cursor line in the active plot."""
+        
+        # Determine active plots depending on mode
+        if self.is_stacked:
+            active_plots = self.stacked_plots
+            offset = 1  # because index 0 is combined_plot
+        else:
+            active_plots = [self.combined_plot]
+            offset = 0
+
+        # Hide everything first
+        for line, label in zip(self.cursor_lines, self.cursor_labels):
+            line.hide()
+            label.hide()
+
+        # Find the plot currently under the mouse
+        target_index = None
+        target_vb = None
+
+        for i, plot in enumerate(active_plots):
+            if plot.vb.sceneBoundingRect().contains(pos):
+                target_index = i + offset  # adjust index for combined plot
+                target_vb = plot.vb
+                break
+
+        if target_vb is None:
+            return
+
+        # Convert scene → data coords
+        mouse_point = target_vb.mapSceneToView(pos)
+        x = mouse_point.x()
+
+        # Update line + label in the correct plot
+        line = self.cursor_lines[target_index]
+        label = self.cursor_labels[target_index]
+
+        line.setPos(x)
+        line.show()
+
+        # Label at top of plot
+        (_, _), (ymin, ymax) = target_vb.viewRange()
+        label.setText(f"x = {x:.3f}")
+        label.setPos(x, ymax)
+        label.show()
+
 if __name__ == '__main__':
     """
     AI GENERATED CODE WARNING

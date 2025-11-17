@@ -22,11 +22,15 @@ class WaitUntilSetpointAction(WaitAction):
         self.sources_checking = set()
         self.recipe_table = recipe_table
         self.row = row
+        self.target_setpoints = {}
+        self.previous_setpoints = {}
         
         # Gather values and associate with source names
         values_dict = self.gather_values_dict(recipe_table, row)
         for source_name, value in values_dict.items():
             if value is not None:
+                self.previous_setpoints[source_name] = self.sources[source_name].get_setpoint()
+                self.target_setpoints[source_name] = value
                 self.sources[source_name].set_setpoint(float(value))
                 self.sources_checking.add(source_name)
         
@@ -70,5 +74,10 @@ class WaitUntilSetpointAction(WaitAction):
             return
         
         for source_name in self.sources_checking:
-            if self.sources[source_name].get_process_variable() > self.sources[source_name].get_setpoint():
+            previous = self.previous_setpoints[source_name]
+            target = self.target_setpoints[source_name]
+            process_variable = self.sources[source_name]
+            
+            # Perform sign comparison to check if target has been "passed"
+            if (process_variable - target) * (previous - target) < 0:
                 self.sources_finished.add(source_name)

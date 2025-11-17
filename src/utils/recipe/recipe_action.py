@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 # Base class for all recipe actions
 class RecipeAction(QObject):
     can_continue = Signal()
+    update_monitor_data = Signal(str)
     
     def __init__(self):
         super().__init__()
@@ -47,7 +48,7 @@ class RecipeAction(QObject):
             if item is None:
                 values_dict[name] = None
             
-            value = item.text() if item.text() is not "" else None
+            value = item.text() if item.text() != "" else None
             values_dict[name] = value
             
         return values_dict

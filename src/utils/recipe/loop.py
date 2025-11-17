@@ -22,9 +22,11 @@ class LoopAction(RecipeAction):
         self.start_step = row
 
         if self.count_remaining == 0:
+            self.update_monitor_data.emit(str(1))
             self.count_remaining = count
         else:
             self.count_remaining -= 1
+            self.update_monitor_data.emit(str(count - self.count_remaining + 1))
         
         self.can_continue.emit()
     
