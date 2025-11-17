@@ -120,14 +120,14 @@ class SourceControlWidget(QWidget):
         # Add widgets to layout
         layout.addWidget(self.label)
         layout.addWidget(self.circle)
-        layout.addWidget(self.input_setpoint, stretch=1)
-        layout.addWidget(self.set_setpoint_button)
-        layout.addWidget(self.input_rate_limit, stretch=1)
-        layout.addWidget(self.set_rate_limit_button)
         layout.addWidget(self.display_temp, stretch=1)
         layout.addWidget(self.display_setpoint, stretch=1)
         layout.addLayout(wsp_layout, stretch=1)
         layout.addWidget(self.display_rate_limit, stretch=1)
+        layout.addWidget(self.input_setpoint, stretch=1)
+        layout.addWidget(self.set_setpoint_button)
+        layout.addWidget(self.input_rate_limit, stretch=1)
+        layout.addWidget(self.set_rate_limit_button)
         layout.addWidget(self.pid_button)
         layout.addWidget(self.safety_button)
 
