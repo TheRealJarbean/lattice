@@ -150,7 +150,7 @@ class MainWindow(uiclass, baseclass):
         
         self.pressure_gauges: list[PressureGauge] = []
         
-        for i, pressure_config in enumerate(hardware_config['devices']['pressure'].values()):
+        for pressure_config in hardware_config['devices']['pressure'].values():
             ser = serial.Serial(
                 port=pressure_config['serial']['port'], 
                 baudrate=pressure_config['serial']['baudrate'],
@@ -159,13 +159,14 @@ class MainWindow(uiclass, baseclass):
             
             mutex = QMutex()
             
-            self.pressure_gauges.extend([PressureGauge(
-                name=gauge['name'], 
-                address=gauge['address'],
-                idx=i,
-                ser=ser,
-                serial_mutex=mutex
-                ) for gauge in pressure_config['connections']])
+            for i, gauge in enumerate(pressure_config['connections']):
+                self.pressure_gauges.append(PressureGauge(
+                    name=gauge['name'], 
+                    address=gauge['address'],
+                    idx=i,
+                    ser=ser,
+                    serial_mutex=mutex
+                ))
             
         self.pressure_tab = PressureTab(self.pressure_gauges)
         
