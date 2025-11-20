@@ -79,7 +79,6 @@ class PressureGauge(QObject):
             self.data_mutex.unlock()
 
             self.is_on_changed.emit(False, self.idx)
-            self.pressure_changed.emit(0, self.idx)
             self.rate_per_second = None
             self.rate_changed.emit(0, self.idx)
             return
@@ -147,19 +146,23 @@ class PressureGauge(QObject):
         if re.search("^[+\-]?(\d+\.\d*|\d*\.\d+|\d+)([eE][+\-]\d+)?", res):
             try:
                 value = float(res)
-                self.pressure_changed.emit(value, self.idx)
-                if value > 0:
+
+                # Pressure gauge is off if value is 0.00
+                if value <= 0:
                     self.data_mutex.lock()
-                    if not self.is_on:
-                        self.is_on = True
-                        self.is_on_changed.emit(True, self.idx)
-                    self.data_mutex.unlock()
-                else:
-                    self.data_mutex.lock()
-                    if not self.is_on:
+                    if self.is_on:
                         self.is_on = False
-                        self.is_on_changed.emit(False, self.idx)
+                        self.is_on_changed.emit(self.is_on, self.idx)
                     self.data_mutex.unlock()
+                    return
+                
+                self.pressure_changed.emit(value, self.idx)
+                
+                self.data_mutex.lock()
+                if not self.is_on:
+                    self.is_on = True
+                    self.is_on_changed.emit(self.is_on, self.idx)
+                self.data_mutex.unlock()
                 
                 # Update rate per second
                 if self.rate_per_second:

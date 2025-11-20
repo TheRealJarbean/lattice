@@ -61,6 +61,10 @@ class PressureControlWidget(QWidget):
             border-color: rgb(0, 0, 0);
             """)
         
+        # Connect on/off button to data reset
+        self.power_toggle_button.clicked.connect(lambda: self.pressure_display.setText(f"{0:.2e}"))
+        self.power_toggle_button.clicked.connect(lambda: self.rate_display.setText(f"{0:.2e}"))
+        
         # Create sub-horizontal layout
         h_layout = QHBoxLayout()
         h_layout.addWidget(self.power_toggle_button)
