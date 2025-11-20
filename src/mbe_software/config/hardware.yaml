@@ -1,0 +1,71 @@
+devices:
+  pressure:
+    COM6:
+      serial:
+        port: null
+        baudrate: 9600
+      connections:
+      - name: Growth Ion
+        address: I1
+      - name: Flux Ion
+        address: I2
+  sources:
+    COM10:
+      serial:
+        port: null
+        baudrate: 9600
+      connections:
+      - name: Scandium
+        device_id: 1
+        address_set: 2604_loop_1
+      - name: Gallium
+        device_id: 1
+        address_set: 2604_loop_2
+      - name: Beryllium
+        device_id: 2
+        address_set: 2604_loop_1
+      - name: Aluminum
+        device_id: 2
+        address_set: 2604_loop_2
+      - name: Indium
+        device_id: 3
+        address_set: 2604_loop_1
+      - name: Silicon
+        device_id: 3
+        address_set: 2604_loop_2
+      - name: Growth
+        device_id: 4
+        address_set: 2604_loop_1
+      - name: Magnesium
+        device_id: 4
+        address_set: 2604_loop_2
+    COM13:
+      serial:
+        port: null
+        baudrate: 9600
+      connections:
+      - name: Mg Cracker
+        device_id: 1
+        address_set: 2404_loop_1
+  shutters:
+    COM8:
+      serial:
+        port: null
+        baudrate: 9600
+      connections:
+      - name: Scandium
+        address: 0
+      - name: Gallium
+        address: 3
+      - name: Beryllium
+        address: 8
+      - name: Aluminum
+        address: 1
+      - name: Indium
+        address: 6
+      - name: Silicon
+        address: 7
+      - name: Growth
+        address: 0
+      - name: Magnesium
+        address: 0

@@ -1,5 +1,5 @@
-from PySide6.QtWidgets import QApplication, QWidget, QGraphicsWidget
-from PySide6.QtGui import QPainter
+from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtCore import QThread
 import pyqtgraph as pg
 import numpy as np
 import logging
@@ -59,7 +59,7 @@ class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
         # Create stacked plots and add to layout with delimiters
         self.stacked_plots = []
         self.delimiters = []
-        for i in range(len(self.curves)):
+        for _ in range(len(self.curves)):
             self.stacked_plots.append(self.addPlot(row=row, col=0))
             row += 1
             
@@ -70,7 +70,7 @@ class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
         self.stacked_x_axis_plot.setFixedHeight(20)
             
         # Change stacked plot settings
-        for i, plot in enumerate(self.stacked_plots):
+        for plot in self.stacked_plots:
             plot.setClipToView(True)
             plot.setAutoVisible(x=True, y=True)
             plot.setAxisItems({'left': ScientificAxis('left')})
@@ -81,7 +81,7 @@ class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
             plot.setXLink(self.stacked_x_axis_plot)
         
         # Show combined by default
-        self.is_stacked = True
+        self.is_stacked = False
         self._update_plot_display()
         
     def update_data(self, time_delta: int = None):
@@ -89,13 +89,14 @@ class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
         max_time = 0 # To scale x axis later
         for i in range(len(self.data)):
             if self.data[i]:
-                timestamps, values = zip(*self.data[i])
+                arr = np.array(self.data[i])
+                timestamps = arr[:, 0]
+                values = arr[:, 1]
+                
+                self.curves[i].setData(timestamps, values)
+                
                 if timestamps[-1] > max_time:
                     max_time = timestamps[-1]
-                self.curves[i].setData(
-                    np.array(timestamps),
-                    np.array(values)
-                )
 
         # Optional: auto-scroll x-axis
         if time_delta:

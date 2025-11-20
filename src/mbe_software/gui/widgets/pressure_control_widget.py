@@ -1,5 +1,5 @@
 import sys
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtWidgets import (
     QWidget, 
     QLabel, 
@@ -78,6 +78,18 @@ class PressureControlWidget(QWidget):
         layout.addWidget(self.pressure_display)
 
         self.setLayout(layout)
+        
+    @Slot(float)
+    def format_and_display_pressure(self, pressure):
+        self.pressure_display.setText(f"{pressure:.2e}")
+        
+    @Slot(float)
+    def format_and_display_rate(self, rate):
+        self.rate_display.setText(f"{rate:.2e}")
+        
+    @Slot(float)
+    def update_on_off_text(self, is_on):
+        self.power_toggle_button.setText("Turn Off" if is_on else "Turn On")
 
 # Run as standalone app for testing
 if __name__ == "__main__":

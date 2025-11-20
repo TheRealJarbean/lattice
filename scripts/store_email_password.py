@@ -2,7 +2,8 @@
 A simple script to store password for email account in local OS keyring.
 
 Author: Jaron Anderson
-Data: 10-22-2025
+Email: jaron@pressanybutton.us
+Date: 10-22-2025
 Version: 1.0
 
 # DESCRIPTION

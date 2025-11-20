@@ -2,7 +2,7 @@ import logging
 
 # Local imports
 from .wait_until_setpoint import WaitUntilSetpointAction
-from devices.source import Source
+from mbe_software.devices.source import Source
 
 logger = logging.getLogger(__name__)
 

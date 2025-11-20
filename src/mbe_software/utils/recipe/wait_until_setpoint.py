@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QTableWidget
 
 # Local imports
 from .wait_action import WaitAction
-from devices.source import Source
+from mbe_software.devices.source import Source
 
 logger = logging.getLogger(__name__)
 

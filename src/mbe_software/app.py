@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QApplication, QMenu, QHeaderView,
     QComboBox, QTableWidgetItem, QTableWidget, 
     QPushButton, QFileDialog, QMessageBox,
-    QSpacerItem, QSizePolicy, QLabel, QLineEdit
+    QLabel, QLineEdit
 )
 from PySide6.QtCore import Qt, QTimer, QMutex, QThread, Signal, QEvent, QObject
 from PySide6.QtGui import QAction, QBrush, QColor
@@ -22,16 +22,16 @@ from pymodbus.client import ModbusSerialClient as ModbusClient
 from pymodbus import pymodbus_apply_logging_config
 
 # Local imports
-from devices.shutter import Shutter
-from devices.source import Source
-from devices.pressure import Pressure
-from gui.input_modal_widget import InputModalWidget
-from gui.pressure_control_widget import PressureControlWidget
-from gui.source_control_widget import SourceControlWidget
-from gui.log_widgets import SerialLogWidget, ModbusLogWidget
-from gui.shutter_control_widget import ShutterControlWidget
-from gui.stacked_scrolling_plot_widget import StackedScrollingPlotWidget
-from utils import recipe, EmailAlert
+from mbe_software.devices import Shutter, Source, PressureGauge
+from mbe_software.gui.widgets import (
+    InputModalWidget,
+    SourceControlWidget,
+    SerialLogWidget,
+    ModbusLogWidget,
+    ShutterControlWidget
+)
+from mbe_software.gui.tabs import PressureTab
+from mbe_software.utils import recipe, EmailAlert
 
 # Set the log level based on env variable when program is run
 # Determines which logging statements are printed to console
@@ -148,9 +148,9 @@ class MainWindow(uiclass, baseclass):
         # PRESSURE SETUP #
         ##################
         
-        self.pressure_gauges: list[Pressure] = []
+        self.pressure_gauges: list[PressureGauge] = []
         
-        for pressure_config in hardware_config['devices']['pressure'].values():
+        for i, pressure_config in enumerate(hardware_config['devices']['pressure'].values()):
             ser = serial.Serial(
                 port=pressure_config['serial']['port'], 
                 baudrate=pressure_config['serial']['baudrate'],
@@ -159,26 +159,15 @@ class MainWindow(uiclass, baseclass):
             
             mutex = QMutex()
             
-            self.pressure_gauges.extend([Pressure(
+            self.pressure_gauges.extend([PressureGauge(
                 name=gauge['name'], 
                 address=gauge['address'],
+                idx=i,
                 ser=ser,
                 serial_mutex=mutex
                 ) for gauge in pressure_config['connections']])
             
-        # Create dict for accessing gauges by name
-        self.pressure_gauge_dict = {gauge.name: gauge for gauge in self.pressure_gauges}
-        
-        # Create thread
-        self.pressure_thread = QThread()
-        for gauge in self.pressure_gauges:
-            gauge.moveToThread(self.pressure_thread)
-        
-        # Initialize pressure data object and connect signal
-        self.pressure_data = []
-        for i, gauge in enumerate(self.pressure_gauges):
-            self.pressure_data.append(deque(maxlen=7200)) # 3 hours of data at polling rate of 500ms
-            gauge.pressure_changed.connect(partial(self.on_new_pressure_data, i))
+        self.pressure_tab = PressureTab(self.pressure_gauges)
         
         ################
         # SOURCE SETUP #
@@ -305,64 +294,6 @@ class MainWindow(uiclass, baseclass):
         
         # Copied rows data
         self.copied_rows_data = None
-
-        ###########################
-        # PRESSURE TAB GUI CONFIG #
-        ###########################
-        
-        # Create the pressure control widgets
-        self.pressure_controls_layout = getattr(self, "pressure_controls", None)
-        self.pressure_controls: list[PressureControlWidget] = []
-        
-        step_size = int(360 / len(self.pressure_gauges))
-        for i, gauge in enumerate(self.pressure_gauges):
-            # Add a spacer
-            self.pressure_controls_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
-            
-            # Generate a unique color
-            hue = (i * step_size) + 15
-            saturation = 255
-            brightness = 255
-            color = QColor()
-            color.setHsv(hue, saturation, brightness)
-            
-            # Create control widget
-            controls = PressureControlWidget(gauge.name, color)
-            self.pressure_controls.append(controls)
-            self.pressure_controls_layout.addWidget(controls)
-            
-            # Connect displayed pressure
-            gauge.pressure_changed.connect(lambda pressure, i=i: self.pressure_controls[i].pressure_display.setText(f"{pressure:.2e}"))
-            
-            # Connect rate display
-            gauge.rate_changed.connect(lambda rate, i=i: self.pressure_controls[i].rate_display.setText(f"{rate:.2f}"))
-            
-            # Connect on / off button text
-            gauge.is_on_changed.connect(lambda is_on, i=i: self.pressure_controls[i].power_toggle_button.setText("Turn off" if is_on else "Turn on"))
-            
-            # Connect power toggle button action
-            controls.power_toggle_button.clicked.connect(gauge.toggle_on_off)
-            
-        # Add one last spacer (at this point the layout is | widget | widget ... with no closing spacer)
-        self.pressure_controls_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
-        
-        # Create pressure data plot
-        self.pressure_plot = StackedScrollingPlotWidget(
-            names=[gauge.name for gauge in self.pressure_gauges],
-            data=self.pressure_data,
-            colors=[controls.color for controls in self.pressure_controls]
-        )
-        
-        # Add pressure data plot to container
-        pressure_plot_container = getattr(self, "pressure_plot_container", None)
-        pressure_plot_container.addWidget(self.pressure_plot)
-        
-        # Connect pressure plot split and combine buttons
-        pressure_plot_split = getattr(self, "pressure_plot_split", None)
-        pressure_plot_combine = getattr(self, "pressure_plot_combine", None)
-        
-        pressure_plot_split.clicked.connect(self.pressure_plot.show_stacked)
-        pressure_plot_combine.clicked.connect(self.pressure_plot.show_combined)
         
         #########################
         # SOURCE TAB GUI CONFIG #
@@ -625,6 +556,7 @@ class MainWindow(uiclass, baseclass):
         
         # Set tab bar context menu
         tab_widget = getattr(self, "main_tabs", None)
+        tab_widget.addTab(self.pressure_tab, "Pressure")
         tab_widget.tabBar().setContextMenuPolicy(Qt.CustomContextMenu)
         tab_widget.tabBar().customContextMenuRequested.connect(self.on_tab_context_menu)
         
@@ -634,37 +566,13 @@ class MainWindow(uiclass, baseclass):
         #################
         # START THREADS #
         #################
-        
-        self.pressure_thread.start()
+
         self.source_thread.start()
         self.shutter_thread.start()
-
-        # Start polling for pressure data
-        for gauge in self.pressure_gauges:
-            gauge.start_polling(1000)
 
         # # Start polling for source data
         for source in self.sources:
             source.start_polling(500)
-    
-    ####################
-    # Pressure Methods #
-    ####################
-    
-    def on_new_pressure_data(self, idx, data):
-        # Store data
-        self.pressure_data[idx].append((time.monotonic() - self.start_time, data))
-        
-        # Update plot and constrain x-axis
-        time_lock_checkbox = getattr(self, "pressure_plot_time_lock", None)
-        if time_lock_checkbox.isChecked():
-            time_delta_field = getattr(self, "pressure_plot_time_delta", None)
-            time_delta = time_delta_field.value()
-            self.pressure_plot.update_data(time_delta)
-            return
-        
-        # Don't constrain x-axis
-        self.pressure_plot.update_data()
                 
     ##################
     # SOURCE METHODS #
