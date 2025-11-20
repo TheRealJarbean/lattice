@@ -1,7 +1,6 @@
 .vscode/
 venv/
 recipes/
-*/config/*.yaml
 
 # Everything below this line is generic python boilerplate gitignore
 
