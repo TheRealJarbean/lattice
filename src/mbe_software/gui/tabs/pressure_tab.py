@@ -105,6 +105,7 @@ class PressureTab(QWidget):
         
         # Create time window lock widgets
         self.time_lock_checkbox = QCheckBox("Lock Time Window (seconds)")
+        self.time_lock_checkbox.setChecked(True)
         self.time_lock_input = QSpinBox(minimum=0, maximum=100000, value=30)
         self.time_lock_input.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.time_lock_input.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -152,7 +153,7 @@ class PressureTab(QWidget):
         self.pressure_thread.start()
         
         for gauge in self.pressure_gauges:
-            self.start_polling.emit(gauge, 100)
+            self.start_polling.emit(gauge, 1000)
 
     @Slot(float, int) # Value, idx
     def on_new_pressure_data(self, data, idx):
