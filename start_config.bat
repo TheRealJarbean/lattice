@@ -5,4 +5,4 @@ cd /d "%~dp0"
 
 title Configurator
 call venv\Scripts\activate.bat
-venv\Scripts\python.exe src\configurator.py
+venv\Scripts\python.exe src\mbe_software\configurator.py
