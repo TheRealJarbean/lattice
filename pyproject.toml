@@ -5,9 +5,34 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mbe_software"
 version = "0.1.0"
+dependencies = [
+    "jaraco-classes==3.4.0",
+    "jaraco-context==6.0.1",
+    "jaraco-functools==4.3.0",
+    "keyring==25.6.0",
+    "more-itertools==10.8.0",
+    "numpy==2.3.3",
+    "pymodbus==3.11.3",
+    "pyqtgraph==0.13.7",
+    "pyserial==3.5",
+    "pyside6==6.9.2",
+    "pyside6-addons==6.9.2",
+    "pyside6-essentials==6.9.2",
+    "pywin32-ctypes==0.2.3",
+    "pyyaml==6.0.3",
+    "shiboken6==6.9.2",
+]
+requires-python = ">=3.13,<3.14"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[dependency-groups]
+dev = [
+    "pip-licenses>=5.5.0",
+    "pyinstaller>=6.17.0",
+    "setuptools>=80.9.0",
+]
 
 [project.scripts]
 mbe-software = "mbe_software.app:start"
