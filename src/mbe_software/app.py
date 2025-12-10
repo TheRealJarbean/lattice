@@ -22,6 +22,7 @@ from pymodbus.client import ModbusSerialClient as ModbusClient
 from pymodbus import pymodbus_apply_logging_config
 
 # Local imports
+from mbe_software.utils.config import *
 from mbe_software.devices import Shutter, Source, PressureGauge
 from mbe_software.gui.widgets import (
     InputModalWidget,
@@ -51,35 +52,7 @@ pymodbus_apply_logging_config(level=logging.CRITICAL)
 logging.basicConfig(level=LOG_LEVEL_MAP[LOG_LEVEL])
 logger = logging.getLogger(__name__)
 
-# Get the directory of this script and set other important directories
-base_dir = os.path.dirname(os.path.abspath(__file__))
-hardware_config_path = os.path.join(base_dir, 'config', 'hardware.yaml')
-theme_config_path = os.path.join(base_dir, 'config', 'theme.yaml')
-parameter_config_path = os.path.join(base_dir, 'config', 'parameters.yaml')
-email_alert_config_path = os.path.join(base_dir, 'config', 'alerts.yaml')
 main_ui_path = os.path.join(base_dir, 'gui', 'main.ui')
-
-# Load config files
-if os.path.exists(hardware_config_path):
-    with open(hardware_config_path, 'r') as f:
-        hardware_config = yaml.safe_load(f)
-else:
-    hardware_config = {
-        "devices": {
-            "pressure": "",
-            "sources": "",
-            "shutters": ""
-        }
-    }
-    
-with open(theme_config_path, 'r') as f:
-    theme_config = yaml.safe_load(f)
-    
-with open(parameter_config_path, 'r') as f:
-    parameter_config = yaml.safe_load(f)
-    
-with open(email_alert_config_path, 'r') as f:
-    alert_config = yaml.safe_load(f)
 
 uiclass, baseclass = pg.Qt.loadUiType(main_ui_path)
 
@@ -139,7 +112,7 @@ class MainWindow(uiclass, baseclass):
         self.start_time = time.monotonic()
         
         # Configure email alerts
-        self.alert = EmailAlert(alert_config['recipients'])
+        self.alert = EmailAlert(ALERT_CONFIG['recipients'])
         
         # Apply focus clearing filter
         QApplication.instance().installEventFilter(CLEAR_FOCUS_FILTER)
@@ -150,7 +123,7 @@ class MainWindow(uiclass, baseclass):
         
         self.pressure_gauges: list[PressureGauge] = []
         
-        for pressure_config in hardware_config['devices']['pressure'].values():
+        for pressure_config in HARDWARE_CONFIG['devices']['pressure'].values():
             ser = serial.Serial(
                 port=pressure_config['serial']['port'], 
                 baudrate=pressure_config['serial']['baudrate'],
@@ -176,10 +149,10 @@ class MainWindow(uiclass, baseclass):
         
         self.sources: list[Source] = []
         
-        if parameter_config['sources']['safety'] is None:
-            parameter_config['sources']['safety'] = {}
-        safety_settings = parameter_config['sources']['safety']
-        for source_config in hardware_config['devices']['sources'].values():
+        if PARAMETER_CONFIG['sources']['safety'] is None:
+            PARAMETER_CONFIG['sources']['safety'] = {}
+        safety_settings = PARAMETER_CONFIG['sources']['safety']
+        for source_config in HARDWARE_CONFIG['devices']['sources'].values():
             logger.debug(source_config)
             logger.debug(source_config['serial']['port'])
             client = ModbusClient(
@@ -196,26 +169,6 @@ class MainWindow(uiclass, baseclass):
                 client=client,
                 serial_mutex=mutex
                 ) for device in source_config['connections']])
-            
-        # Create dict for accessing sources by name
-        self.source_dict = {source.name: source for source in self.sources}
-        
-        # Create thread
-        self.source_thread = QThread()
-        for source in self.sources:
-            source.moveToThread(self.source_thread)
-
-        # Initialize source data object
-        self.source_process_variable_data = []
-        self.source_working_setpoint_data = []
-        for _ in range(len(self.sources)):
-            self.source_process_variable_data.append(deque(maxlen=7200)) # 3 hours of data at default polling rate of 500ms
-            self.source_working_setpoint_data.append(deque(maxlen=7200))
-
-        # Connect source process variable and working setpoint changes to data handling
-        for i in range(len(self.sources)):
-            self.sources[i].process_variable_changed.connect(partial(self.on_new_source_process_variable, i))
-            self.sources[i].working_setpoint_changed.connect(partial(self.on_new_source_working_setpoint, i))
         
         #################
         # SHUTTER SETUP #
@@ -223,7 +176,7 @@ class MainWindow(uiclass, baseclass):
         
         self.shutters: list[Shutter] = []
         
-        for shutter_config in hardware_config['devices']['shutters'].values():
+        for shutter_config in HARDWARE_CONFIG['devices']['shutters'].values():
             ser = serial.Serial(
                 port=shutter_config['serial']['port'], 
                 baudrate=shutter_config['serial']['baudrate'],
@@ -295,104 +248,6 @@ class MainWindow(uiclass, baseclass):
         
         # Copied rows data
         self.copied_rows_data = None
-        
-        #########################
-        # SOURCE TAB GUI CONFIG #
-        #########################
-        
-        # Create the source control widgets
-        self.source_controls_layout = getattr(self, "source_controls", None)
-        self.source_controls: list[SourceControlWidget] = []
-    
-        while len(theme_config['source_tab']['colors']) < len(self.sources):
-            theme_config['source_tab']['colors'].append("FFFFFF")
-        
-        colors = theme_config['source_tab']['colors']
-            
-        for i in range(len(self.sources)):
-            color = "FFFFFF" # Default color
-            if 0 <= i < len(colors):
-                color = colors[i]
-            controls = SourceControlWidget(color=f"#{color}")
-            self.source_controls.append(controls)
-            self.source_controls_layout.addWidget(controls)
-        
-        # Apply per-control widget config and connections
-        for i, controls in enumerate(self.source_controls):
-            # Set source name labels
-            controls.label.setText(self.sources[i].get_name())
-            
-            # Connect color change methods
-            controls.circle.color_changed.connect(partial(self.on_source_color_change, i))
-            
-            # Assign modals to PID and Safe Rate Limit buttons
-            controls.pid_button.clicked.connect(partial(self.open_pid_input_modal, i))
-            controls.safety_button.clicked.connect(partial(self.open_safe_rate_limit_input_modal, i))
-
-            # Connect set buttons
-            controls.set_setpoint_button.clicked.connect(partial(self.on_source_setpoint_set_clicked, i))
-            controls.set_rate_limit_button.clicked.connect(partial(self.on_source_rate_limit_set_clicked, i))
-            
-            # Connect working setpoint plot checkboxes
-            controls.plot_working_setpoint.stateChanged.connect(
-                lambda state, i=i: self.source_working_setpoint_curves[i].setVisible(bool(state))
-                )
-            
-            # Connect variable displays
-            self.sources[i].process_variable_changed.connect(
-                lambda pv, c=controls: c.display_temp.setText(f"{pv:.2f} C")
-            )
-            self.sources[i].setpoint_changed.connect(
-                lambda sp, c=controls: c.display_setpoint.setText(f"{sp:.2f} C")
-            )
-            self.sources[i].working_setpoint_changed.connect(
-                lambda wsp, c=controls: c.display_working_setpoint.setText(f"{wsp:.2f} C")
-            )
-            self.sources[i].rate_limit_changed.connect(
-                lambda rate, c=controls: c.display_rate_limit.setText(f"{rate:.2f} C/s") # Convert form /min to /s
-            )
-            
-            # TODO: Connect extra display for power depending on mg_bulk and mg_cracker needs
-            
-        # Configure source data plot
-        self.source_graph_widget.plotItem.setAxisItems({'bottom': TimeAxis('bottom')})
-        self.source_graph_widget.enableAutoRange(axis='x', enable=False)
-        self.source_graph_widget.enableAutoRange(axis='y', enable=True)
-        self.source_graph_widget.setXRange(0, 30)
-        
-        # Create curves
-        self.source_process_variable_curves: list[pg.PlotCurveItem] = []
-        self.source_working_setpoint_curves: list[pg.PlotCurveItem] = []
-        for controls in self.source_controls:
-            self.source_process_variable_curves.append(self.source_graph_widget.plot(pen=pg.mkPen(controls.circle.color, width=2)))
-            self.source_working_setpoint_curves.append(self.source_graph_widget.plot(pen=pg.mkPen(controls.circle.color, width=2, style=Qt.DashLine)))
-        
-        # Clip rendered data to only what is currently visible
-        for curve in self.source_process_variable_curves + self.source_working_setpoint_curves:
-            curve.setClipToView(True)
-        
-        # Hide working setpoint curves by default
-        for curve in self.source_working_setpoint_curves:
-            curve.setVisible(False)
-            
-        # Add cursor tracking line
-        self.source_cursor_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('y', width=1))
-        self.source_cursor_label = pg.TextItem(color="y")
-
-        self.source_graph_widget.plotItem.addItem(self.source_cursor_line, ignoreBounds=True)
-        self.source_graph_widget.plotItem.addItem(self.source_cursor_label, ignoreBounds=True)
-
-        self.source_cursor_line.hide()
-        self.source_cursor_label.hide()
-        
-        # Connect mouse tracking
-        self._last_mouse_scene_pos = None
-        self.source_graph_widget.scene().sigMouseMoved.connect(self._on_source_mouse_moved)
-            
-        # Start timer to update source data plot
-        self.source_plot_update_timer = QTimer()
-        self.source_plot_update_timer.timeout.connect(self.update_source_plot)
-        self.source_plot_update_timer.start(20)
         
         ###########################
         # SHUTTER TAB GUI CONFIG  #
@@ -657,11 +512,11 @@ class MainWindow(uiclass, baseclass):
             
             # Save changes to config since safety settings are not stored on-device
             # Ensure source entry exists
-            logger.debug(parameter_config)
-            if source.name not in parameter_config['sources']['safety']:
-                parameter_config['sources']['safety'][source.name] = {}
+            logger.debug(PARAMETER_CONFIG)
+            if source.name not in PARAMETER_CONFIG['sources']['safety']:
+                PARAMETER_CONFIG['sources']['safety'][source.name] = {}
                 
-            config = parameter_config['sources']['safety'][source.name]
+            config = PARAMETER_CONFIG['sources']['safety'][source.name]
             config["from"] = safe_from
             config["to"] = safe_to
             config["rate_limit"] = safe_rate_limit
@@ -679,8 +534,8 @@ class MainWindow(uiclass, baseclass):
         self.source_process_variable_curves[idx].setPen(color)
         
         # Save color change to config file
-        theme_config['source_tab']['colors'][idx] = color[1:] # Remove leading '#'
-        self.write_config_changes(theme_config, theme_config_path)
+        THEME_CONFIG['source_tab']['colors'][idx] = color[1:] # Remove leading '#'
+        self.write_config_changes(THEME_CONFIG, theme_config_path)
 
     def update_source_plot(self):
         # Update the plot with new full dataset

@@ -1,5 +1,6 @@
-from . import tabs
+from . import tabs, widgets
 
 __all__ = [
-    "tabs"
+    "tabs",
+    "widgets"
 ]
