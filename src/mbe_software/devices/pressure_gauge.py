@@ -12,16 +12,15 @@ class PressureGauge(QObject):
     Sensor names appear to be T1 I1 I2 and I3
     Appears to request updates periodically, wait 25ms for a response, and wait 10ms to loop
     """
-    pressure_changed = Signal(float, int) # Value, idx
-    rate_changed = Signal(float, int) # Value, idx
-    is_on_changed = Signal(bool, int) # State, idx
+    pressure_changed = Signal(float, QObject) # Value, self ref
+    rate_changed = Signal(float, QObject) # Value, self ref
+    is_on_changed = Signal(bool, QObject) # State, self ref
     new_serial_data = Signal(str, str) # Name, data
 
-    def __init__(self, name, address, idx, ser: serial.Serial, serial_mutex: QMutex):
+    def __init__(self, name, address, ser: serial.Serial, serial_mutex: QMutex):
         super().__init__()
         self.name = name
         self.address = address
-        self.idx = idx
         self.ser = ser
         self.rate_per_second = 0.0
         self.is_on = False
@@ -78,9 +77,9 @@ class PressureGauge(QObject):
             self.is_on = False
             self.data_mutex.unlock()
 
-            self.is_on_changed.emit(False, self.idx)
+            self.is_on_changed.emit(False, self)
             self.rate_per_second = None
-            self.rate_changed.emit(0, self.idx)
+            self.rate_changed.emit(0, self)
             return
         
         self.data_mutex.lock()
@@ -88,7 +87,7 @@ class PressureGauge(QObject):
         self.data_mutex.unlock()
         
         logger.debug(f"Turning on gauge {name}")
-        self.is_on_changed.emit(True, self.idx)
+        self.is_on_changed.emit(True, self)
         self.send_command(f'#0031{address}')
     
     @Slot()
@@ -143,7 +142,7 @@ class PressureGauge(QObject):
         
         res = res[1:] # trim leading >
         # Scientific notation regex
-        if re.search("^[+\-]?(\d+\.\d*|\d*\.\d+|\d+)([eE][+\-]\d+)?", res):
+        if re.search("^[+\\-]?(\\d+\\.\\d*|\\d*\\.\\d+|\\d+)([eE][+\\-]\\d+)?", res):
             try:
                 value = float(res)
 
@@ -152,16 +151,16 @@ class PressureGauge(QObject):
                     self.data_mutex.lock()
                     if self.is_on:
                         self.is_on = False
-                        self.is_on_changed.emit(self.is_on, self.idx)
+                        self.is_on_changed.emit(self.is_on, self)
                     self.data_mutex.unlock()
                     return
                 
-                self.pressure_changed.emit(value, self.idx)
+                self.pressure_changed.emit(value, self)
                 
                 self.data_mutex.lock()
                 if not self.is_on:
                     self.is_on = True
-                    self.is_on_changed.emit(self.is_on, self.idx)
+                    self.is_on_changed.emit(self.is_on, self)
                 self.data_mutex.unlock()
                 
                 # Update rate per second
@@ -170,7 +169,7 @@ class PressureGauge(QObject):
                 else:
                     self.rate_per_second = value
                 
-                self.rate_changed.emit(self.rate_per_second, self.idx)
+                self.rate_changed.emit(self.rate_per_second, self)
                 self.update_rate = False
 
             except Exception as e:

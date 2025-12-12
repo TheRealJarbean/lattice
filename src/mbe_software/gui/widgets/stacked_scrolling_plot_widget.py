@@ -23,22 +23,22 @@ class TimeAxis(pg.AxisItem):
         return [format_time(int(v)) for v in values]
 
 class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
-    def __init__(self, names: list[str], data: list[deque[(float, float)]], colors: list[str]):
+    def __init__(self, names: list[str], data_dict: list[deque[(float, float)]], colors: list[str]):
         super().__init__()
         
-        if len(colors) < len(data):
+        if len(colors) < len(data_dict):
             logger.error("Length of colors does not match length of data!")
             return
 
         # Store references to data and colors
         self.names = names
-        self.data = data
+        self.data_dict = data_dict
         self.colors = colors
         
         # Create curves
         self.curves = [
             pg.PlotCurveItem(pen=pg.mkPen(self.colors[i], width=2))
-            for i in range(len(data))
+            for i in range(len(data_dict))
         ]
         
         # Set starting row
@@ -87,9 +87,9 @@ class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
     def update_data(self, time_delta: int = None):
         # Update the plot with new full dataset
         max_time = 0 # To scale x axis later
-        for i in range(len(self.data)):
-            if self.data[i]:
-                arr = np.array(self.data[i])
+        for i, data in enumerate(self.data_dict.values()):
+            if data:
+                arr = np.array(data)
                 timestamps = arr[:, 0]
                 values = arr[:, 1]
                 
@@ -165,7 +165,7 @@ if __name__ == '__main__':
     n_signals = 3
     names = [f"Signal {i+1}" for i in range(n_signals)]
     colors = ['r', 'g', 'c']
-    data = [deque(maxlen=200) for _ in range(n_signals)]
+    data = {i: deque(maxlen=200) for i in range(n_signals)}
 
     # ---- Main Widget ----
     main_widget = QWidget()

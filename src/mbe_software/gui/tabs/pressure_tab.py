@@ -47,9 +47,9 @@ class PressureTab(QWidget):
             gauge.moveToThread(self.pressure_thread)
         
         # Initialize pressure data object and connect signal
-        self.pressure_data = []
-        for i, gauge in enumerate(self.pressure_gauges):
-            self.pressure_data.append(deque(maxlen=7200)) # 3 hours of data at polling rate of 500ms
+        self.pressure_data = {}
+        for gauge in self.pressure_gauges:
+            self.pressure_data[gauge] = deque(maxlen=7200) # 3 hours of data at polling rate of 500ms
             gauge.pressure_changed.connect(self.on_new_pressure_data)
         
         # Connect start/stop polling signals
@@ -92,7 +92,7 @@ class PressureTab(QWidget):
         # Create pressure data plot
         self.pressure_plot = StackedScrollingPlotWidget(
             names=[gauge.name for gauge in self.pressure_gauges],
-            data=self.pressure_data,
+            data_dict=self.pressure_data,
             colors=[controls.color for controls in self.pressure_control_widgets]
         )
         
@@ -155,10 +155,10 @@ class PressureTab(QWidget):
         for gauge in self.pressure_gauges:
             self.start_polling.emit(gauge, 1000)
 
-    @Slot(float, int) # Value, idx
-    def on_new_pressure_data(self, data, idx):
+    @Slot(PressureGauge, float) # Gauge ref, Value
+    def on_new_pressure_data(self, data, gauge: PressureGauge):
         # Store data
-        self.pressure_data[idx].append((timing.uptime_seconds(), data))
+        self.pressure_data[gauge].append((timing.uptime_seconds(), data))
         
         # Update plot and constrain x-axis
         if self.time_lock_checkbox.isChecked():
@@ -188,7 +188,6 @@ if __name__ == "__main__":
         gauges.append(PressureGauge(
             name=names[i],
             address=addresses[i],
-            idx=i,
             ser=ser,
             serial_mutex=mutex
         ))

@@ -1,19 +1,22 @@
 import os
 import logging
 import yaml
-from importlib import resources
+import sys
+from pathlib import Path
+
+# Local imports
+from mbe_software.definitions import ROOT_DIR
 
 logger = logging.getLogger(__name__)
 
 class Config:
     def __init__(self, path, default: dict):
         self._path = path
-        with path.open("r") as f:
-            if os.path.exists(_hardware_config_path):
-                with open(_hardware_config_path, 'r') as f:
-                    self.data = yaml.safe_load(f)
-            else:
-                self.data = default
+        if os.path.exists(self._path):
+            with open(self._path, 'r') as f:
+                self.data = yaml.safe_load(f)
+        else:
+            self.data = default
 
     def save(self):
         with self._path.open("w") as f:
@@ -26,44 +29,44 @@ class Config:
         self.data[key] = value
 
 # Get the directory of this script and set other important directories
-_config_dir = resources.files("mbe_software.config")
-_hardware_config_path = Config(_config_dir / 'hardware.yaml')
-_theme_config_path = Config(_config_dir / 'theme.yaml')
-_parameter_config_path = Config(_config_dir / 'parameters.yaml')
-_alert_config_path = Config(_config_dir / 'alerts.yaml')
+CONFIG_DIR = ROOT_DIR / "config"
+HARDWARE_CONFIG_PATH = CONFIG_DIR / 'hardware.yaml'
+THEME_CONFIG_PATH = CONFIG_DIR / 'theme.yaml'
+PARAMETER_CONFIG_PATH = CONFIG_DIR / 'parameters.yaml'
+ALERT_CONFIG_PATH = CONFIG_DIR / 'alerts.yaml'
 
 # Load hardware config or defaults
-_hardware_default = {
+HARDWARE_DEFAULT = {
     "devices": {
         "pressure": {},
         "sources": {},
         "shutters": {}
     }
 }
-HARDWARE_CONFIG = Config(_hardware_config_path, _hardware_default)
+HARDWARE_CONFIG = Config(HARDWARE_CONFIG_PATH, HARDWARE_DEFAULT)
 
 # Load theme config or defaults
-_theme_default = {
+THEME_DEFAULT = {
     "source_tab": {
         "colors": []
     }
 }
-THEME_CONFIG = Config(_theme_config_path, _theme_default)
+THEME_CONFIG = Config(THEME_CONFIG_PATH, THEME_DEFAULT)
 
 # Load parameter config or defaults
-_parameter_default = {
+PARAMETER_DEFAULT = {
     "sources": {
         "safety": {}
     }
 }
-PARAMETER_CONFIG = Config(_parameter_config_path, _parameter_default)
+PARAMETER_CONFIG = Config(PARAMETER_CONFIG_PATH, PARAMETER_DEFAULT)
 
 # Load parameter config or defaults
-_alert_default = {
+ALERT_DEFAULT = {
     "sender": "",
     "recipients": []
 }
-ALERT_CONFIG = Config(_alert_config_path, _alert_default)
+ALERT_CONFIG = Config(ALERT_CONFIG_PATH, ALERT_DEFAULT)
     
 __all__ = [
     "HARDWARE_CONFIG", 

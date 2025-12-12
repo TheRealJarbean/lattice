@@ -12,9 +12,9 @@ import numpy as np
 import time
 import logging
 import os
-import yaml
 import serial
 import csv
+from pathlib import Path
 from collections import deque
 from datetime import timedelta
 from functools import partial
@@ -22,7 +22,7 @@ from pymodbus.client import ModbusSerialClient as ModbusClient
 from pymodbus import pymodbus_apply_logging_config
 
 # Local imports
-from mbe_software.utils.config import *
+import mbe_software.utils.config as config
 from mbe_software.devices import Shutter, Source, PressureGauge
 from mbe_software.gui.widgets import (
     InputModalWidget,
@@ -31,7 +31,7 @@ from mbe_software.gui.widgets import (
     ModbusLogWidget,
     ShutterControlWidget
 )
-from mbe_software.gui.tabs import PressureTab
+from mbe_software.gui.tabs import PressureTab, SourceTab
 from mbe_software.utils import recipe, EmailAlert
 
 # Set the log level based on env variable when program is run
@@ -52,6 +52,7 @@ pymodbus_apply_logging_config(level=logging.CRITICAL)
 logging.basicConfig(level=LOG_LEVEL_MAP[LOG_LEVEL])
 logger = logging.getLogger(__name__)
 
+base_dir = Path(__file__).parent
 main_ui_path = os.path.join(base_dir, 'gui', 'main.ui')
 
 uiclass, baseclass = pg.Qt.loadUiType(main_ui_path)
@@ -112,7 +113,7 @@ class MainWindow(uiclass, baseclass):
         self.start_time = time.monotonic()
         
         # Configure email alerts
-        self.alert = EmailAlert(ALERT_CONFIG['recipients'])
+        self.alert = EmailAlert(config.ALERT_CONFIG['recipients'])
         
         # Apply focus clearing filter
         QApplication.instance().installEventFilter(CLEAR_FOCUS_FILTER)
@@ -122,8 +123,9 @@ class MainWindow(uiclass, baseclass):
         ##################
         
         self.pressure_gauges: list[PressureGauge] = []
-        
-        for pressure_config in HARDWARE_CONFIG['devices']['pressure'].values():
+
+        print(config.HARDWARE_CONFIG['devices'])
+        for pressure_config in config.HARDWARE_CONFIG['devices']['pressure'].values():
             ser = serial.Serial(
                 port=pressure_config['serial']['port'], 
                 baudrate=pressure_config['serial']['baudrate'],
@@ -132,11 +134,12 @@ class MainWindow(uiclass, baseclass):
             
             mutex = QMutex()
             
-            for i, gauge in enumerate(pressure_config['connections']):
+            for gauge in pressure_config['connections']:
+                idx = len(self.pressure_gauges)
                 self.pressure_gauges.append(PressureGauge(
                     name=gauge['name'], 
                     address=gauge['address'],
-                    idx=i,
+                    idx=idx,
                     ser=ser,
                     serial_mutex=mutex
                 ))
@@ -149,10 +152,10 @@ class MainWindow(uiclass, baseclass):
         
         self.sources: list[Source] = []
         
-        if PARAMETER_CONFIG['sources']['safety'] is None:
-            PARAMETER_CONFIG['sources']['safety'] = {}
-        safety_settings = PARAMETER_CONFIG['sources']['safety']
-        for source_config in HARDWARE_CONFIG['devices']['sources'].values():
+        if config.PARAMETER_CONFIG['sources']['safety'] is None:
+            config.PARAMETER_CONFIG['sources']['safety'] = {}
+        safety_settings = config.PARAMETER_CONFIG['sources']['safety']
+        for source_config in config.HARDWARE_CONFIG['devices']['sources'].values():
             logger.debug(source_config)
             logger.debug(source_config['serial']['port'])
             client = ModbusClient(
@@ -161,14 +164,23 @@ class MainWindow(uiclass, baseclass):
                 timeout=0.1
                 )
             mutex = QMutex()
-            self.sources.extend([Source(
-                name=device['name'],
-                device_id=device['device_id'],
-                address_set=device['address_set'],
-                safety_settings=safety_settings.get(device['name'], {}),
-                client=client,
-                serial_mutex=mutex
-                ) for device in source_config['connections']])
+            
+            for device in source_config['connections']:
+                idx = len(self.sources)
+                self.sources.extend(Source(
+                    name=device['name'],
+                    device_id=device['device_id'],
+                    idx=idx,
+                    address_set=device['address_set'],
+                    safety_settings=safety_settings.get(device['name'], {}),
+                    client=client,
+                    serial_mutex=mutex
+                    ))
+                
+        self.sources_tab = SourceTab(self.sources)
+            
+        # Create dict for accessing sources by name
+        self.source_dict = {source.name: source for source in self.sources}
         
         #################
         # SHUTTER SETUP #
@@ -176,7 +188,7 @@ class MainWindow(uiclass, baseclass):
         
         self.shutters: list[Shutter] = []
         
-        for shutter_config in HARDWARE_CONFIG['devices']['shutters'].values():
+        for shutter_config in config.HARDWARE_CONFIG['devices']['shutters'].values():
             ser = serial.Serial(
                 port=shutter_config['serial']['port'], 
                 baudrate=shutter_config['serial']['baudrate'],
@@ -429,188 +441,6 @@ class MainWindow(uiclass, baseclass):
         # # Start polling for source data
         for source in self.sources:
             source.start_polling(500)
-                
-    ##################
-    # SOURCE METHODS #
-    ##################
-
-    def on_new_source_process_variable(self, idx, pv):
-        self.source_process_variable_data[idx].append((time.monotonic() - self.start_time, pv))
-        
-    def on_new_source_working_setpoint(self, idx, wsp):
-        self.source_working_setpoint_data[idx].append((time.monotonic() - self.start_time, wsp))
-        
-    def on_source_setpoint_set_clicked(self, idx):
-        setpoint = self.source_controls[idx].input_setpoint.value()
-        self.sources[idx].set_setpoint(setpoint)
-    
-    def on_source_rate_limit_set_clicked(self, idx):
-        rate_limit = self.source_controls[idx].input_rate_limit.value()
-        logger.debug(f"VALUE OF BOX {self.source_controls[idx].input_rate_limit.value()}")
-        self.sources[idx].set_rate_limit(rate_limit)
-    
-    def open_pid_input_modal(self, idx):
-        source = self.sources[idx]
-        pid_input_settings = ["PB", "TI", "TD"] # TODO: Ask what these should be
-        current_values = source.get_pid()
-        input_modal = InputModalWidget(
-            pid_input_settings, 
-            defaults=current_values, 
-            window_title='PID Settings'
-            )
-            
-        # On submission
-        if input_modal.exec():
-            values = input_modal.get_values()
-            logger.debug(f"PID Input {idx} Submitted: {values}")
-            pid_pb = values["PB"]
-            pid_ti = values["TI"]
-            pid_td = values["TD"]
-            
-            # Apply changes to source
-            source.set_pid(
-                pid_pb=pid_pb,
-                pid_ti=pid_ti,
-                pid_td=pid_td
-                )
-            
-        # On cancellation
-        else:
-            logger.debug(f"PID Input {idx} Cancelled")
-    
-    def open_safe_rate_limit_input_modal(self, idx):
-        source: Source = self.sources[idx]
-        logger.debug(idx)
-        safe_rate_limit_settings = ["Rate Limit (C/s)", "From (C)", "To (C)", "Max Setpoint (C)", "Stability Tolerance (C)"]
-        current_values = list(source.get_rate_limit_safety())
-        current_values.append(source.get_max_setpoint())
-        current_values.append(source.get_stability_tolerance())
-        input_modal = InputModalWidget(
-            safe_rate_limit_settings,
-            defaults=current_values,
-            window_title='Safety Settings'
-            )
-        
-        # On submission
-        if input_modal.exec():
-            values = input_modal.get_values()
-            logger.debug(f"Safe Rate Limit Input {idx} Submitted: {values}")
-            safe_rate_limit = values[safe_rate_limit_settings[0]]
-            safe_from = values[safe_rate_limit_settings[1]]
-            safe_to = values[safe_rate_limit_settings[2]]
-            max_sp = values[safe_rate_limit_settings[3]]
-            stability_tolerance = values[safe_rate_limit_settings[4]]
-            
-            # Apply changes to source
-            source.set_rate_limit_safety(
-                safe_rate_limit=safe_rate_limit,
-                safe_rate_limit_from=safe_from,
-                safe_rate_limit_to=safe_to
-                )
-            source.set_max_setpoint(max_sp)
-            source.set_stability_tolerance(stability_tolerance)
-            
-            # Save changes to config since safety settings are not stored on-device
-            # Ensure source entry exists
-            logger.debug(PARAMETER_CONFIG)
-            if source.name not in PARAMETER_CONFIG['sources']['safety']:
-                PARAMETER_CONFIG['sources']['safety'][source.name] = {}
-                
-            config = PARAMETER_CONFIG['sources']['safety'][source.name]
-            config["from"] = safe_from
-            config["to"] = safe_to
-            config["rate_limit"] = safe_rate_limit
-            config["max_setpoint"] = max_sp
-            config["stability_tolerance"] = stability_tolerance
-            self.write_config_changes(config, parameter_config_path)
-        
-        # On cancellation
-        else:
-            logger.debug(f"Safe Rate Limit Input {idx} Cancelled")
-            
-    def on_source_color_change(self, idx, color: str):
-        logger.debug(f"Changing source {idx} color to {color}")
-        
-        self.source_process_variable_curves[idx].setPen(color)
-        
-        # Save color change to config file
-        THEME_CONFIG['source_tab']['colors'][idx] = color[1:] # Remove leading '#'
-        self.write_config_changes(THEME_CONFIG, theme_config_path)
-
-    def update_source_plot(self):
-        # Update the plot with new full dataset
-        max_time = 0 # To scale x axis later
-        
-        # Handle process variable data
-        for i in range(len(self.source_process_variable_data)):
-            if self.source_process_variable_data[i]:
-                timestamps, values = zip(*self.source_process_variable_data[i])
-                if timestamps[-1] > max_time:
-                    max_time = timestamps[-1]
-                self.source_process_variable_curves[i].setData(
-                    np.array(timestamps),
-                    np.array(values)
-                )
-        
-        # Handle working setpoint data
-        for i in range(len(self.source_working_setpoint_data)):
-            curve = self.source_working_setpoint_curves[i]
-            
-            if curve.isVisible() and self.source_working_setpoint_data[i]:
-                timestamps, values = zip(*self.source_working_setpoint_data[i])
-                if timestamps[-1] > max_time:
-                    max_time = timestamps[-1]
-                curve.setData(
-                    np.array(timestamps),
-                    np.array(values)
-                )
-
-        # Optional: auto-scroll x-axis
-        time_lock_checkbox = getattr(self, "source_plot_time_lock", None)
-        time_delta_field = getattr(self, "source_plot_time_delta", None)
-        time_delta = time_delta_field.value()
-        if time_lock_checkbox.isChecked():
-            # Show last time_delta seconds
-            if max_time >= time_delta:
-                self.source_graph_widget.setXRange(max(0, max_time - time_delta), max_time)
-            else:
-                self.source_graph_widget.setXRange(max(0, max_time - time_delta), time_delta)
-            
-            # Update cursor position
-            if self._last_mouse_scene_pos is not None:
-                self._update_source_cursor_from_scene_pos(self._last_mouse_scene_pos)
-                
-    def _on_source_mouse_moved(self, pos):
-        self._last_mouse_scene_pos = pos
-        self._update_source_cursor_from_scene_pos(pos)
-        
-    def _update_source_cursor_from_scene_pos(self, pos):
-        """Track mouse location and show cursor line in the source plot."""
-
-        # Hide everything first
-        self.source_cursor_line.hide()
-        self.source_cursor_label.hide()
-
-        # Check if plot is currently under the mouse
-        if not self.source_graph_widget.plotItem.vb.sceneBoundingRect().contains(pos):
-            return
-
-        target_vb = self.source_graph_widget.plotItem.vb
-        
-        # Convert scene → data coords
-        mouse_point = target_vb.mapSceneToView(pos)
-        x = mouse_point.x()
-
-        self.source_cursor_line.setPos(x)
-        self.source_cursor_line.show()
-
-        # Label at top of plot
-        time_str = str(timedelta(seconds=x))
-        time_str = time_str[:time_str.index('.') + 3] # Truncate to two decimals
-        (_, _), (ymin, ymax) = target_vb.viewRange()
-        self.source_cursor_label.setText(f"t = {time_str}")
-        self.source_cursor_label.setPos(x, ymax)
-        self.source_cursor_label.show()
         
     ###################
     # SHUTTER METHODS #
@@ -1200,10 +1030,6 @@ class MainWindow(uiclass, baseclass):
     ################
     # MISC METHODS #
     ################
-    
-    def write_config_changes(self, config: dict, file_path):
-        with open(file_path, "w") as f:
-            yaml.dump(config, f, default_flow_style=False)
             
     def time_since_start(self):
         return time.monotonic() - self.start_time

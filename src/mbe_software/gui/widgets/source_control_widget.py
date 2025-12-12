@@ -40,6 +40,9 @@ class ColorCircle(QLabel):
 
 
 class SourceControlWidget(QWidget):
+    set_setpoint = Signal(float)
+    set_rate_limit = Signal(float)
+
     def __init__(self, color: QColor=QColor("blue"), parent=None):
         super().__init__(parent)
 
@@ -104,6 +107,15 @@ class SourceControlWidget(QWidget):
             display.setFont(font)
             display.setMinimumWidth(100)
 
+        # Make connections
+        self.set_setpoint_button.clicked.connect(
+            lambda: self.set_setpoint.emit(self.input_setpoint.value())
+        )
+
+        self.set_rate_limit_button.clicked.connect(
+            lambda: self.set_rate_limit.emit(self.input_rate_limit.value())
+        )
+
         # Create working setpoint layout
         wsp_layout = QHBoxLayout()
         wsp_layout.setSpacing(10)
@@ -132,6 +144,18 @@ class SourceControlWidget(QWidget):
         layout.addWidget(self.safety_button)
 
         self.setLayout(layout)
+
+    def update_process_variable(self, process_variable):
+        self.display_temp.setText(f"{process_variable:.2f} C")
+
+    def update_setpoint(self, setpoint):
+        self.display_setpoint.setText(f"{setpoint:.2f} C")
+
+    def update_working_setpoint(self, working_setpoint):
+        self.display_working_setpoint.setText(f"{working_setpoint:.2f} C")
+
+    def update_rate_limit(self, rate_limit):
+        self.display_rate_limit.setText(f"{rate_limit:.2f} C/s")
 
 # Run as standalone app for testing
 if __name__ == "__main__":
