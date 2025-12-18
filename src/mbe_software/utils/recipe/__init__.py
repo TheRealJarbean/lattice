@@ -1,6 +1,7 @@
 from .rate_limit import RateLimitAction
 from .setpoint import SetpointAction
 from .shutter import ShutterAction
+from .wait_action import WaitAction
 from .wait_for_seconds import WaitForSecondsAction
 from .wait_until_setpoint import WaitUntilSetpointAction
 from .wait_until_setpoint_stable import WaitUntilSetpointStableAction
@@ -11,6 +12,7 @@ __all__ = [
     "RateLimitAction",
     "SetpointAction",
     "ShutterAction",
+    "WaitAction",
     "WaitForSecondsAction",
     "WaitUntilSetpointAction",
     "WaitUntilSetpointStableAction",

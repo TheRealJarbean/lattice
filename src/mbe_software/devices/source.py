@@ -157,7 +157,7 @@ class Source(QObject):
         self.data_mutex.unlock()
         
         return self.write_data_by_address(address, value)
-        
+    
     def start_polling(self, interval_ms: int):
         self.data_mutex.lock()
         if not self.poll_timer.isActive():

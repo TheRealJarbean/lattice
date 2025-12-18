@@ -35,13 +35,14 @@ class PressureGauge(QObject):
     def send_command(self, cmd) -> str:
         """Send a message to the serial port."""
         self.serial_mutex.lock()
-        try:
+        try: 
             if self.ser and self.ser.is_open:
                 # Clear buffers
                 self.ser.reset_input_buffer()
-                self.ser.reset_output_buffer()
                 
                 self.ser.write(f"{cmd}\r\n".encode('utf-8'))
+                self.ser.flush()
+                time.sleep(0.01)
                 
                 self.data_mutex.lock()
                 self.new_serial_data.emit(self.name, f"O: {cmd}")

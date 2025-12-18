@@ -1,5 +1,16 @@
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import (
+    QWidget, 
+    QCheckBox, 
+    QSpinBox, 
+    QAbstractSpinBox, 
+    QLabel,
+    QHBoxLayout,
+    QVBoxLayout,
+    QSpacerItem,
+    QSizePolicy
+    )
 from PySide6.QtCore import QThread, QTimer, Qt, Signal
+from PySide6.QtGui import QFont
 from collections import deque
 from functools import partial
 from datetime import timedelta
@@ -11,7 +22,7 @@ import time
 # Local imports
 from mbe_software.devices.source import Source
 from mbe_software.gui.widgets import SourceControlWidget, InputModalWidget
-from mbe_software.utils import config
+from mbe_software.utils import config, START_TIME
 
 logger = logging.getLogger(__name__)
 
@@ -28,13 +39,13 @@ class SourceTab(QWidget):
     set_safety = Signal(Source, float, float, float) # Source, rate_limit, from, to
 
     def __init__(self, sources: list[Source]):
-        super.__init__()
+        super().__init__()
         
         self.sources = sources
         
-        ##########
-        # CONFIG #
-        ##########
+        #########
+        # SETUP #
+        #########
 
         # Create thread
         self.source_thread = QThread()
@@ -52,14 +63,43 @@ class SourceTab(QWidget):
         for source in self.sources:
             source.process_variable_changed.connect(self.on_new_source_process_variable)
             source.working_setpoint_changed.connect(self.on_new_source_working_setpoint)
+
+        # Connect own signals
+        for source in self.sources:
+            self.start_polling.connect(source.start_polling)
+            self.stop_polling.connect(source.stop_polling)
+            self.set_setpoint.connect(source.set_setpoint)
+            self.set_rate_limit.connect(source.set_rate_limit)
+            self.set_safety.connect(source.set_rate_limit_safety)
             
         #########################
         # CONTROL WIDGET CONFIG #
         #########################
+
+        # Create header labels
+        self.temperature_label = QLabel("Temperature")
+        self.setpoint_label = QLabel("Setpoint")
+        self.working_setpoint_label = QLabel("Working Setpoint")
+        self.rate_limit_label = QLabel("Rate Limit")
+        self.new_setpoint_label = QLabel("New Setpoint")
+        self.new_rate_limit_label = QLabel("New Rate Limit")
+
+        # Create font
+        font = QFont()
+        font.setPointSize(11)
+        font.setBold(True)
+        font.setUnderline(True)
+
+        # Apply font to header labels
+        self.temperature_label.setFont(font)
+        self.setpoint_label.setFont(font)
+        self.working_setpoint_label.setFont(font)
+        self.rate_limit_label.setFont(font)
+        self.new_setpoint_label.setFont(font)
+        self.new_rate_limit_label.setFont(font)
         
         # Create the source control widgets
-        self.source_controls_layout = getattr(self, "source_controls", None)
-        self.source_controls: list[SourceControlWidget] = []
+        self.control_widgets: list[SourceControlWidget] = []
     
         while len(config.THEME_CONFIG['source_tab']['colors']) < len(self.sources):
             config.THEME_CONFIG['source_tab']['colors'].append("FFFFFF")
@@ -74,7 +114,7 @@ class SourceTab(QWidget):
             controls = SourceControlWidget(color=f"#{color}")
 
             # Set source name labels
-            controls.label.setText(self.source.get_name())
+            controls.label.setText(source.get_name())
             
             # Connect color change methods
             controls.circle.color_changed.connect(partial(self.on_source_color_change, i))
@@ -93,39 +133,39 @@ class SourceTab(QWidget):
             #     )
             
             # Connect variable displays
-            self.source.process_variable_changed.connect(
+            source.process_variable_changed.connect(
                 controls.update_process_variable
             )
-            self.source.setpoint_changed.connect(
+            source.setpoint_changed.connect(
                 controls.update_setpoint
             )
-            self.source.working_setpoint_changed.connect(
+            source.working_setpoint_changed.connect(
                 controls.update_working_setpoint
             )
-            self.source.rate_limit_changed.connect(
+            source.rate_limit_changed.connect(
                 controls.update_rate_limit
             )
 
             # Add controls to controls
-            self.source_controls.append(controls)
+            self.control_widgets.append(controls)
         
         ######################
         # PLOT WIDGET CONFIG #
         ######################
 
         # Configure source data plot
-        self.source_graph_widget = pg.PlotWidget
-        self.source_graph_widget.plotItem.setAxisItems({'bottom': TimeAxis('bottom')})
-        self.source_graph_widget.enableAutoRange(axis='x', enable=False)
-        self.source_graph_widget.enableAutoRange(axis='y', enable=True)
-        self.source_graph_widget.setXRange(0, 30)
+        self.plot = pg.PlotWidget()
+        self.plot.setAxisItems({'bottom': TimeAxis('bottom')})
+        self.plot.enableAutoRange(axis='x', enable=False)
+        self.plot.enableAutoRange(axis='y', enable=True)
+        self.plot.setXRange(0, 30)
         
         # Create curves
         self.source_process_variable_curves: list[pg.PlotCurveItem] = []
         self.source_working_setpoint_curves: list[pg.PlotCurveItem] = []
-        for controls in self.source_controls:
-            self.source_process_variable_curves.append(self.source_graph_widget.plot(pen=pg.mkPen(controls.circle.color, width=2)))
-            self.source_working_setpoint_curves.append(self.source_graph_widget.plot(pen=pg.mkPen(controls.circle.color, width=2, style=Qt.DashLine)))
+        for controls in self.control_widgets:
+            self.source_process_variable_curves.append(self.plot.plot(pen=pg.mkPen(controls.circle.color, width=2)))
+            self.source_working_setpoint_curves.append(self.plot.plot(pen=pg.mkPen(controls.circle.color, width=2, style=Qt.DashLine)))
         
         # Clip rendered data to only what is currently visible
         for curve in self.source_process_variable_curves + self.source_working_setpoint_curves:
@@ -139,33 +179,98 @@ class SourceTab(QWidget):
         self.source_cursor_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('y', width=1))
         self.source_cursor_label = pg.TextItem(color="y")
 
-        self.source_graph_widget.plotItem.addItem(self.source_cursor_line, ignoreBounds=True)
-        self.source_graph_widget.plotItem.addItem(self.source_cursor_label, ignoreBounds=True)
+        self.plot.plotItem.addItem(self.source_cursor_line, ignoreBounds=True)
+        self.plot.plotItem.addItem(self.source_cursor_label, ignoreBounds=True)
 
         self.source_cursor_line.hide()
         self.source_cursor_label.hide()
         
         # Connect mouse tracking
         self._last_mouse_scene_pos = None
-        self.source_graph_widget.scene().sigMouseMoved.connect(self._on_source_mouse_moved)
+        self.plot.scene().sigMouseMoved.connect(self._on_source_mouse_moved)
             
         # Start timer to update source data plot
         self.plot_update_timer = QTimer()
         self.plot_update_timer.timeout.connect(self.update_source_plot)
         self.plot_update_timer.start(20)
 
+        # Create time window lock widgets
+        self.time_lock_checkbox = QCheckBox("Lock Time Window (seconds)")
+        self.time_lock_checkbox.setChecked(True)
+        self.time_lock_input = QSpinBox(minimum=0, maximum=100000, value=30)
+        self.time_lock_input.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+        self.time_lock_input.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        #################
+        # LAYOUT WIGETS #
+        #################
+
+        # Create main layout
+        layout = QVBoxLayout()
+
+        # Create header layout
+        header_layout = QHBoxLayout()
+
+        # Add header labels and spacers
+        # Spacer widths are based on widths of control widget items with manual tuning
+        header_layout.addSpacerItem(QSpacerItem(140, 20, QSizePolicy.Fixed, QSizePolicy.Minimum))
+        header_layout.addWidget(self.temperature_label)
+        header_layout.addWidget(self.setpoint_label)
+        header_layout.addWidget(self.working_setpoint_label)
+        header_layout.addWidget(self.rate_limit_label)
+        header_layout.addWidget(self.new_setpoint_label)
+        header_layout.addSpacerItem(QSpacerItem(85, 20, QSizePolicy.Fixed, QSizePolicy.Minimum))
+        header_layout.addWidget(self.new_rate_limit_label)
+        header_layout.addSpacerItem(QSpacerItem(85, 20, QSizePolicy.Fixed, QSizePolicy.Minimum))
+        header_layout.addSpacerItem(QSpacerItem(167, 20, QSizePolicy.Fixed, QSizePolicy.Minimum))
+
+        # Add header layout to controls layout
+        layout.addLayout(header_layout)
+
+        # Add control widgets
+        for control_widget in self.control_widgets:
+            layout.addWidget(control_widget)
+
+        # Add plot
+        layout.addWidget(self.plot)
+
+        # Create plot controls layout
+        plot_controls_layout = QHBoxLayout()
+
+        # Add plot controls and spacer
+        plot_controls_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        for widget in [
+            self.time_lock_checkbox,
+            self.time_lock_input
+        ]:
+            plot_controls_layout.addWidget(widget)
+
+        # Add plot controls layout to main layout
+        layout.addLayout(plot_controls_layout)
+
+        # Apply main layout to self
+        self.setLayout(layout)
+
+        #############
+        # FINISH UP #
+        #############
+
+        self.source_thread.start()
+
+        for source in self.sources:
+            source.start_polling(500)
+
     ##################
     # SOURCE METHODS #
     ##################
 
     def on_new_source_process_variable(self, source: Source, pv: float):
-        self.source_process_variable_data[source].append((time.monotonic() - self.start_time, pv))
+        self.source_process_variable_data[source].append((time.monotonic() - START_TIME, pv))
         
     def on_new_source_working_setpoint(self, source: Source, wsp: float):
-        self.source_working_setpoint_data[source].append((time.monotonic() - self.start_time, wsp))
+        self.source_working_setpoint_data[source].append((time.monotonic() - START_TIME, wsp))
     
-    def open_pid_input_modal(self, idx):
-        source = self.sources[idx]
+    def open_pid_input_modal(self, source: Source):
         pid_input_settings = ["PB", "TI", "TD"] # TODO: Ask what these should be
         current_values = source.get_pid()
         input_modal = InputModalWidget(
@@ -177,7 +282,7 @@ class SourceTab(QWidget):
         # On submission
         if input_modal.exec():
             values = input_modal.get_values()
-            logger.debug(f"PID Input {idx} Submitted: {values}")
+            logger.debug(f"PID Input {source.get_name()} Submitted: {values}")
             pid_pb = values["PB"]
             pid_ti = values["TI"]
             pid_td = values["TD"]
@@ -191,11 +296,9 @@ class SourceTab(QWidget):
             
         # On cancellation
         else:
-            logger.debug(f"PID Input {idx} Cancelled")
+            logger.debug(f"PID Input {source.get_name()} Cancelled")
     
-    def open_safe_rate_limit_input_modal(self, idx):
-        source: Source = self.sources[idx]
-        logger.debug(idx)
+    def open_safe_rate_limit_input_modal(self, source: Source):
         safe_rate_limit_settings = ["Rate Limit (C/s)", "From (C)", "To (C)", "Max Setpoint (C)", "Stability Tolerance (C)"]
         current_values = list(source.get_rate_limit_safety())
         current_values.append(source.get_max_setpoint())
@@ -209,7 +312,7 @@ class SourceTab(QWidget):
         # On submission
         if input_modal.exec():
             values = input_modal.get_values()
-            logger.debug(f"Safe Rate Limit Input {idx} Submitted: {values}")
+            logger.debug(f"Safe Rate Limit Input {source.get_name()} Submitted: {values}")
             safe_rate_limit = values[safe_rate_limit_settings[0]]
             safe_from = values[safe_rate_limit_settings[1]]
             safe_to = values[safe_rate_limit_settings[2]]
@@ -241,7 +344,7 @@ class SourceTab(QWidget):
         
         # On cancellation
         else:
-            logger.debug(f"Safe Rate Limit Input {idx} Cancelled")
+            logger.debug(f"Safe Rate Limit Input {source.get_name()} Cancelled")
             
     def on_source_color_change(self, idx, color: str):
         logger.debug(f"Changing source {idx} color to {color}")
@@ -257,9 +360,9 @@ class SourceTab(QWidget):
         max_time = 0 # To scale x axis later
         
         # Handle process variable data
-        for i in range(len(self.source_process_variable_data)):
-            if self.source_process_variable_data[i]:
-                timestamps, values = zip(*self.source_process_variable_data[i])
+        for i, source in enumerate(self.sources):
+            if self.source_process_variable_data[source]:
+                timestamps, values = zip(*self.source_process_variable_data[source])
                 if timestamps[-1] > max_time:
                     max_time = timestamps[-1]
                 self.source_process_variable_curves[i].setData(
@@ -268,11 +371,11 @@ class SourceTab(QWidget):
                 )
         
         # Handle working setpoint data
-        for i in range(len(self.source_working_setpoint_data)):
+        for i, source in enumerate(self.sources):
             curve = self.source_working_setpoint_curves[i]
             
-            if curve.isVisible() and self.source_working_setpoint_data[i]:
-                timestamps, values = zip(*self.source_working_setpoint_data[i])
+            if curve.isVisible() and self.source_working_setpoint_data[source]:
+                timestamps, values = zip(*self.source_working_setpoint_data[source])
                 if timestamps[-1] > max_time:
                     max_time = timestamps[-1]
                 curve.setData(
@@ -281,15 +384,13 @@ class SourceTab(QWidget):
                 )
 
         # Optional: auto-scroll x-axis
-        time_lock_checkbox = getattr(self, "source_plot_time_lock", None)
-        time_delta_field = getattr(self, "source_plot_time_delta", None)
-        time_delta = time_delta_field.value()
-        if time_lock_checkbox.isChecked():
+        time_delta = self.time_lock_input.value()
+        if self.time_lock_checkbox.isChecked():
             # Show last time_delta seconds
             if max_time >= time_delta:
-                self.source_graph_widget.setXRange(max(0, max_time - time_delta), max_time)
+                self.plot.setXRange(max(0, max_time - time_delta), max_time)
             else:
-                self.source_graph_widget.setXRange(max(0, max_time - time_delta), time_delta)
+                self.plot.setXRange(max(0, max_time - time_delta), time_delta)
             
             # Update cursor position
             if self._last_mouse_scene_pos is not None:
@@ -307,10 +408,10 @@ class SourceTab(QWidget):
         self.source_cursor_label.hide()
 
         # Check if plot is currently under the mouse
-        if not self.source_graph_widget.plotItem.vb.sceneBoundingRect().contains(pos):
+        if not self.plot.plotItem.vb.sceneBoundingRect().contains(pos):
             return
 
-        target_vb = self.source_graph_widget.plotItem.vb
+        target_vb = self.plot.plotItem.vb
         
         # Convert scene → data coords
         mouse_point = target_vb.mapSceneToView(pos)
