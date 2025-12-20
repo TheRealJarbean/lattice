@@ -72,6 +72,7 @@ class InputModalWidget(QDialog):
         main_layout.addLayout(input_layout)
         main_layout.addLayout(button_layout)
         self.setLayout(main_layout)
+        self.adjustSize()
         
     def get_values(self):
         return {key: spin_box.value() for key, spin_box in self.spin_boxes.items()}
