@@ -7,9 +7,12 @@ Releases are hosted on [GitHub](https://github.com/TheRealJarbean/lattice/releas
 
 ## Building From Source
 The following tools are required:
+
 - git
 - [uv](https://docs.astral.sh/uv/)
 - python >=3.13
+
+After installing the required tools, follow these instructions:
 
 1. Clone the repository
 `git clone https://github.com/TheRealJarbean/lattice.git`
