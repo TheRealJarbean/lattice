@@ -13,23 +13,24 @@ The following tools are required:
 - python >=3.13
 
 After installing the required tools, follow these instructions:
+```bash
+# 1. Clone the repository
+git clone https://github.com/TheRealJarbean/lattice.git
 
-1. Clone the repository
-`git clone https://github.com/TheRealJarbean/lattice.git`
+# 2. Open the project in your preferred IDE with a terminal (ex VSCode) or cd into the folder
+cd lattice
 
-2. Open the project in your preferred IDE (ex VSCode) or cd into the folder
-`cd lattice`
+# 3. Create a virtual environment
+uv venv
 
-3. Create a virtual environment
-`uv venv`
+# 4. IMPORTANT: Activate the virtual environment using the command provided after creation
 
-3. Activate the virtual environment using the command provided after creation
+# 5. Install project dependencies
+uv sync
 
-4. Install project dependencies
-`uv sync`
-
-5. Build with pyinstaller
-`pyinstaller ./src/lattice/app.py`
+# 5. Build with pyinstaller
+pyinstaller ./src/lattice/app.py
+```
 
 # Misc Notes
 
