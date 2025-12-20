@@ -48,16 +48,16 @@ class SourceTab(QWidget):
         #########
 
         # Initialize source data object
-        self.source_process_variable_data = {}
-        self.source_working_setpoint_data = {}
+        self.process_variable_data = {}
+        self.working_setpoint_data = {}
         for source in self.sources:
-            self.source_process_variable_data[source] = deque(maxlen=7200) # 3 hours of data at default polling rate of 500ms
-            self.source_working_setpoint_data[source] = deque(maxlen=7200)
+            self.process_variable_data[source] = deque(maxlen=7200) # 3 hours of data at default polling rate of 500ms
+            self.working_setpoint_data[source] = deque(maxlen=7200)
 
         # Connect source process variable and working setpoint changes to data handling
         for source in self.sources:
-            source.process_variable_changed.connect(self.on_new_source_process_variable)
-            source.working_setpoint_changed.connect(self.on_new_source_working_setpoint)
+            source.process_variable_changed.connect(self.on_new_process_variable)
+            source.working_setpoint_changed.connect(self.on_new_working_setpoint)
 
         # Connect own signals
         for source in self.sources:
@@ -95,37 +95,30 @@ class SourceTab(QWidget):
         
         # Create the source control widgets
         self.control_widgets: list[SourceControlWidget] = []
-    
-        while len(config.THEME_CONFIG['source_tab']['colors']) < len(self.sources):
-            config.THEME_CONFIG['source_tab']['colors'].append("FFFFFF")
-        
-        # TODO: make this a dict with source name keys
-        colors = config.THEME_CONFIG['source_tab']['colors']
+
+        # Load config colors
+        config_colors = config.THEME_CONFIG['source_tab']['colors']
+        # Safety in case config is missing color values or has too many
+        config_colors = (config_colors + ["#FFFFFF"] * len(self.sources))[:len(self.sources)]
+        self.colors = dict(zip(self.sources, config_colors))
             
         for i, source in enumerate(self.sources):
-            color = "FFFFFF" # Default color
-            if 0 <= i < len(colors):
-                color = colors[i]
-            controls = SourceControlWidget(color=f"#{color}")
+            color = self.colors[source]
+            controls = SourceControlWidget(color=color)
 
             # Set source name labels
             controls.label.setText(source.get_name())
             
             # Connect color change methods
-            controls.circle.color_changed.connect(partial(self.on_source_color_change, i))
+            controls.circle.color_changed.connect(partial(self.on_color_change, source))
             
             # Assign modals to PID and Safe Rate Limit buttons
-            controls.pid_button.clicked.connect(partial(self.open_pid_input_modal, i))
-            controls.safety_button.clicked.connect(partial(self.open_safe_rate_limit_input_modal, i))
+            controls.pid_button.clicked.connect(partial(self.open_pid_input_modal, source))
+            controls.safety_button.clicked.connect(partial(self.open_safe_rate_limit_input_modal, source))
 
             # Connect set controls
             controls.set_setpoint.connect(source.set_setpoint)
             controls.set_rate_limit.connect(source.set_rate_limit)
-            
-            # Connect working setpoint plot checkboxes
-            # controls.plot_working_setpoint.stateChanged.connect(
-            #     lambda state, i=i: self.source_working_setpoint_curves[i].setVisible(bool(state))
-            #     )
             
             # Connect variable displays
             source.process_variable_changed.connect(
@@ -141,6 +134,11 @@ class SourceTab(QWidget):
                 controls.update_rate_limit
             )
 
+            # Connect working setpoint curve visibility checkboxes
+            controls.plot_working_setpoint.stateChanged.connect(
+                lambda state, source=source: self.working_setpoint_curves[source].setVisible(bool(state))
+            )
+
             # Add controls to controls
             self.control_widgets.append(controls)
         
@@ -149,44 +147,44 @@ class SourceTab(QWidget):
         ######################
 
         # Configure source data plot
-        self.plot = pg.PlotWidget()
-        self.plot.setAxisItems({'bottom': TimeAxis('bottom')})
-        self.plot.enableAutoRange(axis='x', enable=False)
-        self.plot.enableAutoRange(axis='y', enable=True)
-        self.plot.setXRange(0, 30)
+        self.data_plot = pg.PlotWidget()
+        self.data_plot.setAxisItems({'bottom': TimeAxis('bottom')})
+        self.data_plot.enableAutoRange(axis='x', enable=False)
+        self.data_plot.enableAutoRange(axis='y', enable=True)
+        self.data_plot.setXRange(0, 30)
         
         # Create curves
-        self.source_process_variable_curves: list[pg.PlotCurveItem] = []
-        self.source_working_setpoint_curves: list[pg.PlotCurveItem] = []
-        for controls in self.control_widgets:
-            self.source_process_variable_curves.append(self.plot.plot(pen=pg.mkPen(controls.circle.color, width=2)))
-            self.source_working_setpoint_curves.append(self.plot.plot(pen=pg.mkPen(controls.circle.color, width=2, style=Qt.DashLine)))
+        self.process_variable_curves: dict[Source, pg.PlotCurveItem] = {}
+        self.working_setpoint_curves: dict[Source, pg.PlotCurveItem] = {}
+        for source in self.sources:
+            self.process_variable_curves[source] = self.data_plot.plot(pen=pg.mkPen(self.colors[source], width=2))
+            self.working_setpoint_curves[source] = self.data_plot.plot(pen=pg.mkPen(self.colors[source], width=2, style=Qt.DashLine))
         
         # Clip rendered data to only what is currently visible
-        for curve in self.source_process_variable_curves + self.source_working_setpoint_curves:
+        for curve in list(self.process_variable_curves.values()) + list(self.working_setpoint_curves.values()):
             curve.setClipToView(True)
         
         # Hide working setpoint curves by default
-        for curve in self.source_working_setpoint_curves:
+        for curve in list(self.working_setpoint_curves.values()):
             curve.setVisible(False)
             
         # Add cursor tracking line
-        self.source_cursor_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('y', width=1))
-        self.source_cursor_label = pg.TextItem(color="y")
+        self.cursor_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('y', width=1))
+        self.cursor_label = pg.TextItem(color="y")
 
-        self.plot.plotItem.addItem(self.source_cursor_line, ignoreBounds=True)
-        self.plot.plotItem.addItem(self.source_cursor_label, ignoreBounds=True)
+        self.data_plot.plotItem.addItem(self.cursor_line, ignoreBounds=True)
+        self.data_plot.plotItem.addItem(self.cursor_label, ignoreBounds=True)
 
-        self.source_cursor_line.hide()
-        self.source_cursor_label.hide()
+        self.cursor_line.hide()
+        self.cursor_label.hide()
         
         # Connect mouse tracking
         self._last_mouse_scene_pos = None
-        self.plot.scene().sigMouseMoved.connect(self._on_source_mouse_moved)
+        self.data_plot.scene().sigMouseMoved.connect(self._on_mouse_moved)
             
         # Start timer to update source data plot
         self.plot_update_timer = QTimer()
-        self.plot_update_timer.timeout.connect(self.update_source_plot)
+        self.plot_update_timer.timeout.connect(self.update_data_plot)
         self.plot_update_timer.start(20)
 
         # Create time window lock widgets
@@ -227,7 +225,7 @@ class SourceTab(QWidget):
             layout.addWidget(control_widget)
 
         # Add plot
-        layout.addWidget(self.plot)
+        layout.addWidget(self.data_plot)
 
         # Create plot controls layout
         plot_controls_layout = QHBoxLayout()
@@ -254,11 +252,11 @@ class SourceTab(QWidget):
     # SOURCE METHODS #
     ##################
 
-    def on_new_source_process_variable(self, source: Source, pv: float):
-        self.source_process_variable_data[source].append((time.monotonic() - START_TIME, pv))
+    def on_new_process_variable(self, source: Source, pv: float):
+        self.process_variable_data[source].append((time.monotonic() - START_TIME, pv))
         
-    def on_new_source_working_setpoint(self, source: Source, wsp: float):
-        self.source_working_setpoint_data[source].append((time.monotonic() - START_TIME, wsp))
+    def on_new_working_setpoint(self, source: Source, wsp: float):
+        self.working_setpoint_data[source].append((time.monotonic() - START_TIME, wsp))
     
     def open_pid_input_modal(self, source: Source):
         pid_input_settings = ["PB", "TI", "TD"] # TODO: Ask what these should be
@@ -336,36 +334,35 @@ class SourceTab(QWidget):
         else:
             logger.debug(f"Safe Rate Limit Input {source.get_name()} Cancelled")
             
-    def on_source_color_change(self, idx, color: str):
-        logger.debug(f"Changing source {idx} color to {color}")
-        
-        self.source_process_variable_curves[idx].setPen(color)
+    def on_color_change(self, source: Source, color: str):        
+        self.process_variable_curves[source].setPen(color)
         
         # Save color change to config file
-        config.THEME_CONFIG['source_tab']['colors'][idx] = color[1:] # Remove leading '#'
+        self.colors[source] = color
+        config.THEME_CONFIG['source_tab']['colors'] = list(self.colors.values())
         config.THEME_CONFIG.save()
 
-    def update_source_plot(self):
+    def update_data_plot(self):
         # Update the plot with new full dataset
         max_time = 0 # To scale x axis later
         
         # Handle process variable data
         for i, source in enumerate(self.sources):
-            if self.source_process_variable_data[source]:
-                timestamps, values = zip(*self.source_process_variable_data[source])
+            if self.process_variable_data[source]:
+                timestamps, values = zip(*self.process_variable_data[source])
                 if timestamps[-1] > max_time:
                     max_time = timestamps[-1]
-                self.source_process_variable_curves[i].setData(
+                self.process_variable_curves[i].setData(
                     np.array(timestamps),
                     np.array(values)
                 )
         
         # Handle working setpoint data
-        for i, source in enumerate(self.sources):
-            curve = self.source_working_setpoint_curves[i]
+        for source in self.sources:
+            curve = self.working_setpoint_curves[source]
             
-            if curve.isVisible() and self.source_working_setpoint_data[source]:
-                timestamps, values = zip(*self.source_working_setpoint_data[source])
+            if curve.isVisible() and self.working_setpoint_data[source]:
+                timestamps, values = zip(*self.working_setpoint_data[source])
                 if timestamps[-1] > max_time:
                     max_time = timestamps[-1]
                 curve.setData(
@@ -378,45 +375,45 @@ class SourceTab(QWidget):
         if self.time_lock_checkbox.isChecked():
             # Show last time_delta seconds
             if max_time >= time_delta:
-                self.plot.setXRange(max(0, max_time - time_delta), max_time)
+                self.data_plot.setXRange(max(0, max_time - time_delta), max_time)
             else:
-                self.plot.setXRange(max(0, max_time - time_delta), time_delta)
+                self.data_plot.setXRange(max(0, max_time - time_delta), time_delta)
             
             # Update cursor position
             if self._last_mouse_scene_pos is not None:
-                self._update_source_cursor_from_scene_pos(self._last_mouse_scene_pos)
+                self._update_cursor_from_scene_pos(self._last_mouse_scene_pos)
                 
-    def _on_source_mouse_moved(self, pos):
+    def _on_mouse_moved(self, pos):
         self._last_mouse_scene_pos = pos
-        self._update_source_cursor_from_scene_pos(pos)
+        self._update_cursor_from_scene_pos(pos)
         
-    def _update_source_cursor_from_scene_pos(self, pos):
+    def _update_cursor_from_scene_pos(self, pos):
         """Track mouse location and show cursor line in the source plot."""
 
         # Hide everything first
-        self.source_cursor_line.hide()
-        self.source_cursor_label.hide()
+        self.cursor_line.hide()
+        self.cursor_label.hide()
 
         # Check if plot is currently under the mouse
-        if not self.plot.plotItem.vb.sceneBoundingRect().contains(pos):
+        if not self.data_plot.plotItem.vb.sceneBoundingRect().contains(pos):
             return
 
-        target_vb = self.plot.plotItem.vb
+        target_vb = self.data_plot.plotItem.vb
         
         # Convert scene → data coords
         mouse_point = target_vb.mapSceneToView(pos)
         x = mouse_point.x()
 
-        self.source_cursor_line.setPos(x)
-        self.source_cursor_line.show()
+        self.cursor_line.setPos(x)
+        self.cursor_line.show()
 
         # Label at top of plot
         time_str = str(timedelta(seconds=x))
         time_str = time_str[:time_str.index('.') + 3] # Truncate to two decimals
         (_, _), (ymin, ymax) = target_vb.viewRange()
-        self.source_cursor_label.setText(f"t = {time_str}")
-        self.source_cursor_label.setPos(x, ymax)
-        self.source_cursor_label.show()
+        self.cursor_label.setText(f"t = {time_str}")
+        self.cursor_label.setPos(x, ymax)
+        self.cursor_label.show()
 
 # # Run as standalone app for testing
 # if __name__ == "__main__":
