@@ -14,7 +14,6 @@ APP_NAME = 'lattice'
 class Config:
     def __init__(self, filename: str, default: dict):
         self._path = self.get_config_file(filename)
-        print(self._path)
         if os.path.exists(self._path):
             with open(self._path, 'r') as f:
                 yaml_data = yaml.safe_load(f)
