@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class ShutterTab(QWidget, Ui_ShutterTab):
     open_shutter = Signal(Shutter)
     close_shutter = Signal(Shutter)
-    send_shutter_command = Signal(Shutter, str) # Shutter reference, command
+    send_command = Signal(Shutter, str) # Shutter reference, command
 
     def __init__(self, shutters: list[Shutter]):
         super().__init__()
@@ -29,56 +29,56 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         # changes that need to be made based on shutter state
         # The index of the shutter is baked to the connection in for reference later
         for i, shutter in enumerate(self.shutters):
-            shutter.is_open_changed.connect(self.on_shutter_state_change)
+            shutter.is_open_changed.connect(self.on_state_change)
             self.open_shutter.connect(shutter.open)
             self.close_shutter.connect(shutter.close)
-            self.send_shutter_command.connect(shutter.send_custom_command)
+            self.send_command.connect(shutter.send_custom_command)
         
-        self.current_shutter_step = 0
-        self.shutter_loop_step_timer = QTimer()
-        self.shutter_loop_step_timer.setSingleShot(True)
-        self.shutter_loop_step_timer.timeout.connect(self._trigger_next_shutter_step)
+        self.current_step = 0
+        self.loop_step_timer = QTimer()
+        self.loop_step_timer.setSingleShot(True)
+        self.loop_step_timer.timeout.connect(self._trigger_next_step)
         
         # The two QElapsed timers remain accurate even if the program or system lags
-        self.shutter_loop_time_elapsed_ms = 0
-        self.shutter_step_time_elapsed_ms = 0
-        self.shutter_loop_stopwatch_update_timer = QTimer()
-        self.shutter_loop_stopwatch_update_timer.timeout.connect(self.update_shutter_loop_timers)
+        self.loop_time_elapsed_ms = 0
+        self.step_time_elapsed_ms = 0
+        self.loop_stopwatch_update_timer = QTimer()
+        self.loop_stopwatch_update_timer.timeout.connect(self.update_loop_timers)
 
         ###################
         # CONTROLS CONFIG #
         ###################
         
         # Create shutter control widgets
-        shutter_controls_layout = getattr(self, "shutter_controls_layout", None)
-        self.shutter_controls: list[ShutterControlWidget] = []
+        controls_layout = getattr(self, "shutter_controls_layout", None)
+        self.control_widgets: list[ShutterControlWidget] = []
         for shutter in self.shutters:
             widget = ShutterControlWidget(shutter.name, 6)
-            self.shutter_controls.append(widget)
-            shutter_controls_layout.addWidget(widget)
+            self.control_widgets.append(widget)
+            controls_layout.addWidget(widget)
             
         # Connect shutter controls displays and buttons
-        for i, controls in enumerate(self.shutter_controls):
+        for i, controls in enumerate(self.control_widgets):
             # Connect control buttons and set property
-            controls.control_button.clicked.connect(self.on_shutter_control_button_click)
+            controls.control_button.clicked.connect(self.on_control_button_click)
             controls.control_button.setProperty('idx', i)
             
             # Connect output buttons and set property
-            controls.output_button.clicked.connect(self.on_shutter_output_button_click)
+            controls.output_button.clicked.connect(self.on_output_button_click)
             controls.output_button.setProperty('idx', i)
             
             # Connect state buttons and set property
             for button in controls.step_state_buttons:
-                button.clicked.connect(self.on_shutter_step_state_button_clicked)
+                button.clicked.connect(self.on_step_state_button_clicked)
                 button.setProperty('idx', i)
             
         # Connect shutter disable all button
-        shutter_control_off_all_button = getattr(self, "shutter_control_off_all")
-        shutter_control_off_all_button.clicked.connect(self.on_shutter_control_off_all_click)
+        control_off_all_button = getattr(self, "shutter_control_off_all")
+        control_off_all_button.clicked.connect(self.on_control_off_all_click)
                 
         # Connect start/stop button to logic
-        shutter_loop_toggle_button = getattr(self, "shutter_loop_toggle")
-        shutter_loop_toggle_button.clicked.connect(self.on_toggle_loop_button_click)
+        loop_toggle_button = getattr(self, "shutter_loop_toggle")
+        loop_toggle_button.clicked.connect(self.on_toggle_loop_button_click)
 
         # Connect state time inputs
         num_states = 6
@@ -89,7 +89,7 @@ class ShutterTab(QWidget, Ui_ShutterTab):
 
     def on_toggle_loop_button_click(self):
         button = self.sender()
-        self.current_shutter_step = 0
+        self.current_step = 0
         
         step_display = getattr(self, "shutter_current_step", None)
         step_display.setText("0")
@@ -98,10 +98,10 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         loop_count_display.setText("0")
         
         # If loop is already running
-        if self.shutter_loop_step_timer.isActive():
-            self.shutter_loop_step_timer.stop()
-            self.shutter_loop_stopwatch_update_timer.stop()
-            self.reset_shutter_loop_timers()
+        if self.loop_step_timer.isActive():
+            self.loop_step_timer.stop()
+            self.loop_stopwatch_update_timer.stop()
+            self.reset_loop_timers()
             button.setText("Start")
             button.setStyleSheet("""
                 font: 48pt "Segoe UI";
@@ -116,12 +116,12 @@ class ShutterTab(QWidget, Ui_ShutterTab):
             font: 48pt "Segoe UI";
             background-color: rgb(255, 0, 0);
             """)
-        self.shutter_loop_start_time = time.monotonic()
-        self.shutter_loop_stopwatch_update_timer.start(100)
-        self._trigger_next_shutter_step()
+        self.loop_start_time = time.monotonic()
+        self.loop_stopwatch_update_timer.start(100)
+        self._trigger_next_step()
         
-    def _trigger_next_shutter_step(self):
-        step = self.current_shutter_step
+    def _trigger_next_step(self):
+        step = self.current_step
         
         # Increment loop count
         if step == 0:
@@ -135,12 +135,12 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         step_display.setText(f"{step + 1}") # Match user-facing number, not index
         
         # Store step start time
-        self.shutter_step_start_time = time.monotonic()
+        self.step_start_time = time.monotonic()
         
         logger.debug(f"Triggering shutter loop step {step}")
         
         
-        for i, controls in enumerate(self.shutter_controls):
+        for i, controls in enumerate(self.control_widgets):
             is_open = controls.step_state_buttons[step].property("is_open")
             if is_open:
                 self.open_shutter.emit(self.shutters[i])
@@ -155,22 +155,19 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         # Increment step and check if max step has been reached
         max_step_input_widget = getattr(self, "max_loop_step", None)
         max_step = max_step_input_widget.value() - 1 # Indexing starts at 0, user-facing count starts at 1
-        if self.current_shutter_step < max_step:
-            self.current_shutter_step += 1
+        if self.current_step < max_step:
+            self.current_step += 1
         else:
-            self.current_shutter_step = 0
+            self.current_step = 0
         
         # Start timer to trigger next step
-        if self.shutter_loop_step_timer.isActive():
-            self.shutter_loop_step_timer.stop()
-        self.shutter_loop_step_timer.start(state_time)
-
-        # Start thread
-        self.shutter_thread.start()
+        if self.loop_step_timer.isActive():
+            self.loop_step_timer.stop()
+        self.loop_step_timer.start(state_time)
         
-    def update_shutter_loop_timers(self):
-        loop_seconds = time.monotonic() - self.shutter_loop_start_time
-        step_seconds = time.monotonic() - self.shutter_step_start_time
+    def update_loop_timers(self):
+        loop_seconds = time.monotonic() - self.loop_start_time
+        step_seconds = time.monotonic() - self.step_start_time
         
         loop_timer = getattr(self, "shutter_loop_time_elapsed", None)
         step_timer = getattr(self, "shutter_loop_time_in_step", None)
@@ -178,14 +175,14 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         loop_timer.setText(f"{loop_seconds:04.1f} s")
         step_timer.setText(f"{step_seconds:04.1f} s")
         
-    def reset_shutter_loop_timers(self):
+    def reset_loop_timers(self):
         loop_timer = getattr(self, "shutter_loop_time_elapsed", None)
         step_timer = getattr(self, "shutter_loop_time_in_step", None)
         
         loop_timer.setText(f"{0:04.1f} s")
         step_timer.setText(f"{0:04.1f} s")
         
-    def on_shutter_step_state_button_clicked(self):
+    def on_step_state_button_clicked(self):
         button = self.sender()
         is_open = button.property('is_open')
             
@@ -201,7 +198,7 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         button.style().polish(button)
         button.update()
             
-    def on_shutter_control_button_click(self):
+    def on_control_button_click(self):
         button: QPushButton = self.sender()
         is_on = button.property("is_on")
         idx = button.property("idx")
@@ -220,11 +217,11 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         button.style().polish(button)
         button.update()
     
-    def on_shutter_control_off_all_click(self):
+    def on_control_off_all_click(self):
         for shutter in self.shutters:
             shutter.disable()
             
-        for controls in self.shutter_controls:
+        for controls in self.control_widgets:
             button = controls.control_button
             button.setProperty('is_on', False)
             button.setText("OFF")
@@ -234,7 +231,7 @@ class ShutterTab(QWidget, Ui_ShutterTab):
             button.style().polish(button)
             button.update()
             
-    def on_shutter_output_button_click(self):
+    def on_output_button_click(self):
         button: QPushButton = self.sender()
         is_open = button.property("is_open")
         idx = button.property("idx")
@@ -249,12 +246,12 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         button.style().polish(button)
         button.update()
         
-    def on_shutter_state_change(self, shutter: Shutter, is_open):
+    def on_state_change(self, shutter: Shutter, is_open):
         for idx, s in enumerate(self.shutters):
             if s is not shutter:
                 continue
             
-            button = self.shutter_controls[idx].output_button
+            button = self.control_widgets[idx].output_button
             button.setText("Open" if is_open else "Closed")
             button.setProperty('is_open', is_open)
         
