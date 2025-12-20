@@ -35,18 +35,18 @@ pyinstaller ./src/lattice/app.py
 ## Misc Notes
 
 ### Using PySide6 development tools
-- /.venv/Scripts contains many helpful scripts used in designing/updating this software (primarily pyside6-designer)
+- `/.venv/Scripts/` contains many helpful scripts used in designing/updating this software (primarily `pyside6-designer`)
 - https://www.pythonguis.com/tutorials/pyside6-embed-pyqtgraph-custom-widgets/
 
 ### How to use logger:
 - In the top level (app) file the logger is configured
-- In every other module, logger is imported and set to logging.getLogger(__name__) (__name__ automatically names the logger after the file it is in, allowing for easy tracing)
-- logger.debug(statement) allows printing of debug statements only in debug mode across entire application
-- LOG_LEVEL env variable must be set to "DEBUG" for debug messages to print
-- Debug mode PowerShell example: run application with "$env:LOG_LEVEL = "DEBUG"; python .\src\lattice\app.py"
+- In every other module, `logging` is imported and set to `logging.getLogger(__name__)` (__name__ automatically names the logger after the file it is in, allowing for easy tracing)
+- `logger.debug(statement)` allows printing of debug statements only in debug mode across entire application
+- `LOG_LEVEL` env variable must be set to `"DEBUG"` for debug messages to print
+- Debug mode PowerShell example: run application with `"$env:LOG_LEVEL = "DEBUG"; python .\src\lattice\app.py"`
 
 ### Replacing PySide6
 This application uses PySide6 for Qt for Python bindings, which is licensed under LGPL v3. If you would like to replace it, follow these instructions:
 1. Install your preferred bindings library
-2. Replace all "from PySide6" import statements
+2. Replace all `from PySide6` import statements
 3. Rebuild the application (if using bundled release)
