@@ -14,9 +14,15 @@ class Config:
         self._path = path
         if os.path.exists(self._path):
             with open(self._path, 'r') as f:
-                self.data = yaml.safe_load(f)
-        else:
-            self.data = default
+                yaml_data = yaml.safe_load(f)
+                if yaml_data is None:
+                    self.data = default
+                    return
+                
+                self.data = yaml_data
+                return
+        
+        self.data = default
 
     def save(self):
         with self._path.open("w") as f:
