@@ -24,11 +24,6 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         #########
         # SETUP #
         #########
-
-        # Create thread
-        self.shutter_thread = QThread()
-        for shutter in self.shutters:
-            shutter.moveToThread(self.shutter_thread)
             
         # The on_shutter_state_change function will handle any gui
         # changes that need to be made based on shutter state

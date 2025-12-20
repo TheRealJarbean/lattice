@@ -47,11 +47,6 @@ class SourceTab(QWidget):
         # SETUP #
         #########
 
-        # Create thread
-        self.source_thread = QThread()
-        for source in self.sources:
-            source.moveToThread(self.source_thread)
-
         # Initialize source data object
         self.source_process_variable_data = {}
         self.source_working_setpoint_data = {}
@@ -251,12 +246,7 @@ class SourceTab(QWidget):
         # Apply main layout to self
         self.setLayout(layout)
 
-        #############
-        # FINISH UP #
-        #############
-
-        self.source_thread.start()
-
+        # Start polling for source data
         for source in self.sources:
             source.start_polling(500)
 

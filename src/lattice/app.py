@@ -2,7 +2,7 @@ import sys
 from PySide6.QtWidgets import (
     QApplication, QMenu, QMainWindow, QTabWidget
 )
-from PySide6.QtCore import Qt, QMutex, QEvent, QObject
+from PySide6.QtCore import Qt, QMutex, QEvent, QObject, QThread
 from PySide6.QtGui import QAction
 import pyqtgraph as pg
 import time
@@ -79,7 +79,7 @@ class MainWindow(QMainWindow):
         
         self.pressure_gauges: list[PressureGauge] = []
 
-        print(config.HARDWARE_CONFIG['devices'])
+        # Populate pressure gauge list from config file
         for pressure_config in config.HARDWARE_CONFIG['devices']['pressure'].values():
             ser = serial.Serial(
                 port=pressure_config['serial']['port'], 
@@ -96,8 +96,14 @@ class MainWindow(QMainWindow):
                     ser=ser,
                     serial_mutex=mutex
                     ))
-            
-        self.pressure_tab = PressureTab(self.pressure_gauges)
+        
+        # Move pressure gauges to dedicated thread
+        self.pressure_thread = QThread()
+        for gauge in self.pressure_gauges:
+            gauge.moveToThread(self.pressure_thread)
+
+        # Start the pressure thread event loop
+        self.pressure_thread.start()
         
         ################
         # SOURCE SETUP #
@@ -127,11 +133,14 @@ class MainWindow(QMainWindow):
                     client=client,
                     serial_mutex=mutex
                     ))
-                
-        self.sources_tab = SourceTab(self.sources)
-            
-        # Create dict for accessing sources by name
-        self.source_dict = {source.name: source for source in self.sources}
+        
+        # Move sources to dedicated thread
+        self.source_thread = QThread()
+        for source in self.sources:
+            source.moveToThread(self.source_thread)
+
+        # Start the source thread event loop
+        self.source_thread.start()
         
         #################
         # SHUTTER SETUP #
@@ -154,19 +163,22 @@ class MainWindow(QMainWindow):
                 ser=ser, 
                 serial_mutex=serial_mutex
                 ) for shutter in shutter_config['connections']])
-            
+        
+        # Move shutters to dedicated thread
+        self.shutter_thread = QThread()
+        for shutter in self.shutters:
+            shutter.moveToThread(self.shutter_thread)
+
+        # Start the shutter thread event loop
+        self.shutter_thread.start()
+        
+        ##############
+        # GUI CONFIG #
+        ##############
+
+        self.pressure_tab = PressureTab(self.pressure_gauges)
+        self.sources_tab = SourceTab(self.sources)
         self.shutter_tab = ShutterTab(self.shutters)
-        
-        # Create dict for accessing shutters by name
-        self.shutter_dict = {shutter.name: shutter for shutter in self.shutters}
-        
-        ##############################
-        # DIAGNOSTICS TAB GUI CONFIG #
-        ##############################
-        
-        ###################
-        # MISC GUI CONFIG #
-        ###################
 
         self.recipe_tab = RecipeTab(
             gauges=self.pressure_gauges, 
@@ -190,17 +202,7 @@ class MainWindow(QMainWindow):
         tab_widget.tabBar().setContextMenuPolicy(Qt.CustomContextMenu)
         tab_widget.tabBar().customContextMenuRequested.connect(self.on_tab_context_menu)
 
-        ####################
-        # FINAL GUI LAYOUT #
-        ####################
-
         self.setCentralWidget(tab_widget)
-        
-        #################
-        # START THREADS #
-        #################
-
-        # TODO: Move thread starts here
            
     ##################
     # RECIPE METHODS #

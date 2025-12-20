@@ -41,11 +41,6 @@ class PressureTab(QWidget):
         # SETUP #
         #########
         
-        # Create thread
-        self.pressure_thread = QThread()
-        for gauge in self.pressure_gauges:
-            gauge.moveToThread(self.pressure_thread)
-        
         # Initialize pressure data object and connect signal
         self.pressure_data = {}
         for gauge in self.pressure_gauges:
@@ -150,8 +145,6 @@ class PressureTab(QWidget):
         self.setLayout(self.main_layout)
         
         # Start polling for pressure data
-        self.pressure_thread.start()
-        
         for gauge in self.pressure_gauges:
             self.start_polling.emit(gauge, 1000)
 
