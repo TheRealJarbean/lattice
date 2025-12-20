@@ -57,7 +57,7 @@ class PressureTab(QWidget):
         #####################
         
         # Create and connect pressure control widgets
-        self.pressure_control_widgets: list[PressureControlWidget] = []
+        self.control_widgets: list[PressureControlWidget] = []
         hue_step_size = int(360 / len(self.pressure_gauges))
         
         for i, gauge in enumerate(self.pressure_gauges):
@@ -70,7 +70,7 @@ class PressureTab(QWidget):
             
             # Create control widget
             controls = PressureControlWidget(gauge.name, color)
-            self.pressure_control_widgets.append(controls)
+            self.control_widgets.append(controls)
             
             # Connect displayed pressure
             gauge.pressure_changed.connect(controls.format_and_display_pressure)
@@ -88,7 +88,7 @@ class PressureTab(QWidget):
         self.pressure_plot = StackedScrollingPlotWidget(
             names=[gauge.name for gauge in self.pressure_gauges],
             data_dict=self.pressure_data,
-            colors=[controls.color for controls in self.pressure_control_widgets]
+            colors=[controls.color for controls in self.control_widgets]
         )
         
         # Create and connect pressure plot split and combine buttons
@@ -110,17 +110,17 @@ class PressureTab(QWidget):
         ##################
         
         # Create pressure controls layout
-        self.pressure_controls_layout = QHBoxLayout()
+        self.controls_layout = QHBoxLayout()
         
-        for widget in self.pressure_control_widgets:
+        for widget in self.control_widgets:
             # Add a spacer
-            self.pressure_controls_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+            self.controls_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
             
             # Add the widget
-            self.pressure_controls_layout.addWidget(widget)
+            self.controls_layout.addWidget(widget)
             
         # Add one last spacer (at this point the layout is | widget | widget ... with no closing spacer)
-        self.pressure_controls_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        self.controls_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
         
         # Create plot controls layout
         self.plot_controls_layout = QHBoxLayout()
@@ -137,7 +137,7 @@ class PressureTab(QWidget):
         self.main_layout = QVBoxLayout()
         
         # Add sub layouts and widgets to main layout
-        self.main_layout.addLayout(self.pressure_controls_layout)
+        self.main_layout.addLayout(self.controls_layout)
         self.main_layout.addWidget(self.pressure_plot)
         self.main_layout.addLayout(self.plot_controls_layout)
         
