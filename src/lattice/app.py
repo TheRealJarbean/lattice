@@ -64,9 +64,6 @@ class MainWindow(QMainWindow):
         # Change default window size
         self.resize(1400, 900)
         
-        # Set application start time
-        self.start_time = time.monotonic()
-        
         # Configure email alerts
         self.alert = EmailAlert(config.ALERT_CONFIG['recipients'])
         
@@ -203,14 +200,6 @@ class MainWindow(QMainWindow):
         tab_widget.tabBar().customContextMenuRequested.connect(self.on_tab_context_menu)
 
         self.setCentralWidget(tab_widget)
-           
-    ##################
-    # RECIPE METHODS #
-    ##################
-    
-    ################
-    # MISC METHODS #
-    ################
     
     def on_tab_context_menu(self, point):
         tab_index = self.tab_widget.tabBar().tabAt(point)
