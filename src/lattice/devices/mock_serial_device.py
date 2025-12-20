@@ -15,6 +15,9 @@ class MockSerialDevice():
     
     def reset_output_buffer(self):
         pass
+
+    def flush(self):
+        pass
         
     def is_open(self) -> bool:
         return True
