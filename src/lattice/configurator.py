@@ -487,10 +487,13 @@ class MainWindow(QWidget):
                 })
 
         return result
-
-if __name__ == "__main__":
+    
+def start():
     app = QApplication(sys.argv)
     window = MainWindow()
     window.resize(900, 500)
     window.show()
     sys.exit(app.exec())
+
+if __name__ == "__main__":
+    start()

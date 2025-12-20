@@ -35,4 +35,5 @@ dev = [
 ]
 
 [project.scripts]
-mbe-software = "mbe_software.app:start"
+lattice = "lattice.app:start"
+lattice-config = "lattice.configurator:start"

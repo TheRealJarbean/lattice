@@ -20,9 +20,9 @@ import logging
 import time
 
 # Local imports
-from mbe_software.devices.source import Source
-from mbe_software.gui.widgets import SourceControlWidget, InputModalWidget
-from mbe_software.utils import config, START_TIME
+from lattice.devices.source import Source
+from lattice.gui.widgets import SourceControlWidget, InputModalWidget
+from lattice.utils import config, START_TIME
 
 logger = logging.getLogger(__name__)
 

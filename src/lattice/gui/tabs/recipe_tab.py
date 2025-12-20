@@ -17,8 +17,8 @@ import csv
 import logging
 
 # Local imports
-from mbe_software.devices import PressureGauge, Source, Shutter
-from mbe_software.utils import recipe
+from lattice.devices import PressureGauge, Source, Shutter
+from lattice.utils import recipe
 from .ui_recipe_tab import Ui_RecipeTab
 
 logger = logging.getLogger(__name__)

@@ -23,9 +23,9 @@ import sys
 import logging
 
 # Local imports
-from mbe_software.devices import PressureGauge, MockPressureGauge
-from mbe_software.gui.widgets import PressureControlWidget, StackedScrollingPlotWidget
-from mbe_software.utils import timing
+from lattice.devices import PressureGauge, MockPressureGauge
+from lattice.gui.widgets import PressureControlWidget, StackedScrollingPlotWidget
+from lattice.utils import timing
 
 logger = logging.getLogger(__name__)
 

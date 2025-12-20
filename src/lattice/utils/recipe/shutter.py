@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QTableWidget, QComboBox
 
 # Local imports
 from .recipe_action import RecipeAction
-from mbe_software.devices.shutter import Shutter
+from lattice.devices.shutter import Shutter
 
 logger = logging.getLogger(__name__)
 

@@ -14,16 +14,16 @@ from pymodbus.client import ModbusSerialClient as ModbusClient
 from pymodbus import pymodbus_apply_logging_config
 
 # Local imports
-import mbe_software.utils.config as config
-from mbe_software.devices import Shutter, Source, PressureGauge
-from mbe_software.gui.tabs import (
+import lattice.utils.config as config
+from lattice.devices import Shutter, Source, PressureGauge
+from lattice.gui.tabs import (
     PressureTab,
     SourceTab,
     ShutterTab,
     RecipeTab,
     DiagnosticsTab
     )
-from mbe_software.utils import EmailAlert
+from lattice.utils import EmailAlert
 
 # Set the log level based on env variable when program is run
 # Determines which logging statements are printed to console
@@ -248,8 +248,12 @@ class MainWindow(QMainWindow):
             
         # Show the popped out tab
         tab.show()
-        
-app = QApplication(sys.argv)# 
-window = MainWindow()
-window.show()
-app.exec()
+
+def start():
+    app = QApplication(sys.argv)# 
+    window = MainWindow()
+    window.show()
+    app.exec()
+
+if __name__ == "__main__":
+    start()

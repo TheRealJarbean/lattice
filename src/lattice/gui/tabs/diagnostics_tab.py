@@ -3,8 +3,8 @@ from PySide6.QtGui import QFont
 import logging
 
 # Local imports
-from mbe_software.devices import PressureGauge, Shutter, Source
-from mbe_software.gui.widgets import ModbusLogWidget, SerialLogWidget
+from lattice.devices import PressureGauge, Shutter, Source
+from lattice.gui.widgets import ModbusLogWidget, SerialLogWidget
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 # Local imports
-from mbe_software.definitions import ROOT_DIR
+from lattice.definitions import ROOT_DIR
 
 logger = logging.getLogger(__name__)
 

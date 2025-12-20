@@ -2,7 +2,7 @@ import logging
 
 # Local imports
 from .wait_until_setpoint import WaitUntilSetpointAction
-from mbe_software.devices.source import Source
+from lattice.devices.source import Source
 
 logger = logging.getLogger(__name__)
 

@@ -4,8 +4,8 @@ import logging
 import time
 
 # Local imports
-from mbe_software.devices.shutter import Shutter
-from mbe_software.gui.widgets import ShutterControlWidget
+from lattice.devices.shutter import Shutter
+from lattice.gui.widgets import ShutterControlWidget
 from .ui_shutter_tab import Ui_ShutterTab
 
 logger = logging.getLogger(__name__)
