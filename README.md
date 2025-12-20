@@ -43,7 +43,8 @@ pyinstaller ./src/lattice/app.py
 - In every other module, `logging` is imported and set to `logging.getLogger(__name__)` (__name__ automatically names the logger after the file it is in, allowing for easy tracing)
 - `logger.debug(statement)` allows printing of debug statements only in debug mode across entire application
 - `LOG_LEVEL` env variable must be set to `"DEBUG"` for debug messages to print
-- Debug mode PowerShell example: run application with `"$env:LOG_LEVEL = "DEBUG"; python .\src\lattice\app.py"`
+- Debug mode PowerShell example: run application with <br>
+`"$env:LOG_LEVEL = "DEBUG"; python .\src\lattice\app.py"`
 
 ### Replacing PySide6
 This application uses PySide6 for Qt for Python bindings, which is licensed under LGPL v3. If you would like to replace it, follow these instructions:
