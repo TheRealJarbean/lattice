@@ -7,11 +7,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 class PressureGauge(QObject):
-    """
-    Pressure sensors currently use COM6
-    Sensor names appear to be T1 I1 I2 and I3
-    Appears to request updates periodically, wait 25ms for a response, and wait 10ms to loop
-    """
     pressure_changed = Signal(float, QObject) # Value, self ref
     rate_changed = Signal(float, QObject) # Value, self ref
     is_on_changed = Signal(bool, QObject) # State, self ref

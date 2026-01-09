@@ -68,9 +68,6 @@ class Shutter(QObject):
 
     @Slot()
     def open(self, shutter=None):
-        """
-        DO NOT CALL THIS METHOD DIRECTLY FROM MAIN THREAD
-        """
         if shutter is not self:
             return
 
@@ -90,9 +87,6 @@ class Shutter(QObject):
 
     @Slot()
     def close(self, shutter=None):
-        """
-        DO NOT CALL THIS METHOD DIRECTLY FROM MAIN THREAD
-        """
         if shutter is not self:
             return
         
@@ -112,9 +106,6 @@ class Shutter(QObject):
         
     @Slot()
     def send_custom_command(self, command, shutter=None):
-        """
-        DO NOT CALL THIS METHOD DIRECTLY FROM MAIN THREAD
-        """
         if shutter is not self:
             return
         
