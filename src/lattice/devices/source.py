@@ -100,7 +100,7 @@ class Source(QObject):
         # Create and connect the stability timer
         self.stability_timer = QTimer()
         self.stability_timer.timeout.connect(self.check_stability)
-        # self.stability_timer.start(500)
+        self.stability_timer.start(500)
 
         
     def read_data_by_address(self, address: int, count=2):
