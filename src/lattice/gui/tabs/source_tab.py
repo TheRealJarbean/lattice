@@ -102,7 +102,7 @@ class SourceTab(QWidget):
         config_colors = (config_colors + ["#FFFFFF"] * len(self.sources))[:len(self.sources)]
         self.colors = dict(zip(self.sources, config_colors))
             
-        for i, source in enumerate(self.sources):
+        for source in self.sources:
             color = self.colors[source]
             controls = SourceControlWidget(color=color)
 
@@ -157,6 +157,7 @@ class SourceTab(QWidget):
         self.process_variable_curves: dict[Source, pg.PlotCurveItem] = {}
         self.working_setpoint_curves: dict[Source, pg.PlotCurveItem] = {}
         for source in self.sources:
+            print(self.colors[source])
             self.process_variable_curves[source] = self.data_plot.plot(pen=pg.mkPen(self.colors[source], width=2))
             self.working_setpoint_curves[source] = self.data_plot.plot(pen=pg.mkPen(self.colors[source], width=2, style=Qt.DashLine))
         
@@ -185,7 +186,7 @@ class SourceTab(QWidget):
         # Start timer to update source data plot
         self.plot_update_timer = QTimer()
         self.plot_update_timer.timeout.connect(self.update_data_plot)
-        self.plot_update_timer.start(20)
+        self.plot_update_timer.start(1000)
 
         # Create time window lock widgets
         self.time_lock_checkbox = QCheckBox("Lock Time Window (seconds)")
@@ -246,16 +247,16 @@ class SourceTab(QWidget):
 
         # Start polling for source data
         for source in self.sources:
-            source.start_polling(500)
+            source.start_polling(2000)
 
     ##################
     # SOURCE METHODS #
     ##################
 
-    def on_new_process_variable(self, source: Source, pv: float):
+    def on_new_process_variable(self, pv: float, source: Source):
         self.process_variable_data[source].append((time.monotonic() - START_TIME, pv))
         
-    def on_new_working_setpoint(self, source: Source, wsp: float):
+    def on_new_working_setpoint(self, wsp: float, source: Source):
         self.working_setpoint_data[source].append((time.monotonic() - START_TIME, wsp))
     
     def open_pid_input_modal(self, source: Source):
@@ -347,12 +348,12 @@ class SourceTab(QWidget):
         max_time = 0 # To scale x axis later
         
         # Handle process variable data
-        for i, source in enumerate(self.sources):
+        for source in self.sources:
             if self.process_variable_data[source]:
                 timestamps, values = zip(*self.process_variable_data[source])
                 if timestamps[-1] > max_time:
                     max_time = timestamps[-1]
-                self.process_variable_curves[i].setData(
+                self.process_variable_curves[source].setData(
                     np.array(timestamps),
                     np.array(values)
                 )

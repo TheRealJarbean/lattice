@@ -71,8 +71,9 @@ class Source(QObject):
         self.data_mutex = QMutex()
 
         # Stability attributes
-        self.stability_time = None
+        self.stability_time = time.monotonic()
         self.is_stable = False
+        self.is_pv_close_to_sp = False
         
         if safety_settings:
             logger.debug(f"""
@@ -100,7 +101,7 @@ class Source(QObject):
         # Create and connect the stability timer
         self.stability_timer = QTimer()
         self.stability_timer.timeout.connect(self.check_stability)
-        self.stability_timer.start(500)
+        self.stability_timer.start(1000)
 
         
     def read_data_by_address(self, address: int, count=2):
@@ -180,9 +181,6 @@ class Source(QObject):
         if new_setpoint is not None:
             self.setpoint_changed.emit(new_setpoint, self)
 
-        if new_working_setpoint is not None:
-            self.working_setpoint_changed.emit(new_working_setpoint, self)
-
         if new_rate_limit is not None:
             self.rate_limit_changed.emit(new_rate_limit, self)
 
@@ -192,21 +190,27 @@ class Source(QObject):
                 self.rate_limit = new_rate_limit
             self.data_mutex.unlock()
 
-        if new_process_variable is None:
-            return
-        
-        self.process_variable_changed.emit(new_process_variable, self)
-        
-        self.data_mutex.lock()
-        safe_rate, safe_from, safe_to = self.safe_rate_limit, self.safe_rate_limit_from, self.safe_rate_limit_to
-        rate_limit = self.rate_limit
-        self.data_mutex.unlock()
+        if new_working_setpoint is not None:
+            self.working_setpoint_changed.emit(new_working_setpoint, self)
 
+            self.data_mutex.lock()
+            safe_rate, safe_from, safe_to = self.safe_rate_limit, self.safe_rate_limit_from, self.safe_rate_limit_to
+            rate_limit = self.rate_limit
+            self.data_mutex.unlock()
 
-        if not any(x <= 0.0 for x in (safe_rate, safe_from, safe_to)):
-            if safe_from < new_working_setpoint < safe_to:
-                self._set_rate_limit(safe_rate)
-                return
+            if not any(x <= 0.0 for x in (safe_rate, safe_from, safe_to)):
+                if safe_from < new_working_setpoint < safe_to:
+                    self._set_rate_limit(safe_rate)
+
+        if new_process_variable is not None:
+            self.process_variable_changed.emit(new_process_variable, self)
+
+            if new_setpoint is not None:
+                self.data_mutex.lock()
+                tolerance = self.stability_tolerance
+                self.data_mutex.unlock()
+                
+                self.is_pv_close_to_sp = math.isclose(new_setpoint, new_process_variable, abs_tol=tolerance)
             
         self._set_rate_limit(rate_limit)
         
@@ -281,6 +285,7 @@ class Source(QObject):
         self.write_data_by_key("setpoint", setpoint)
     
     def set_rate_limit(self, rate_limit):
+        print(f"Setting rate limit to {rate_limit}")
         self.data_mutex.lock()
         self.rate_limit = rate_limit
         self.data_mutex.unlock()
@@ -324,28 +329,22 @@ class Source(QObject):
         self.data_mutex.lock()
         self.stability_tolerance = value
         self.data_mutex.unlock()
-            
-    def is_pv_close_to_sp(self):
-        current_sp = self.get_setpoint()
-        current_pv = self.get_process_variable()
-        if None in [current_sp, current_pv]:
-            logger.error("Could not read sp or pv when comparing sp and pv")
-            return
-        
-        self.data_mutex.lock()
-        tolerance = self.stability_tolerance
-        self.data_mutex.unlock()
-        
-        return math.isclose(current_sp, current_pv, abs_tol=tolerance)
     
     def check_stability(self):
-        if not self.is_pv_close_to_sp():
+        self.data_mutex.lock()
+        is_stable = self.is_stable
+        self.data_mutex.unlock()
+
+        if not self.is_pv_close_to_sp:
             self.data_mutex.lock()
-            self.stability_time = None
+            self.stability_time = time.monotonic()
             self.is_stable = False
             self.data_mutex.unlock()
             
             self.is_stable_changed.emit(False, self)
+            return
+        
+        if is_stable:
             return
         
         self.data_mutex.lock()
@@ -358,8 +357,3 @@ class Source(QObject):
             self.data_mutex.unlock()
             
             self.is_stable_changed.emit(True, self)
-
-        if stability_time is None:
-            self.data_mutex.lock()
-            self.stability_time = time.monotonic()
-            self.data_mutex.unlock()
