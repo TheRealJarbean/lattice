@@ -137,7 +137,7 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         # Store step start time
         self.step_start_time = time.monotonic()
         
-        logger.debug(f"Triggering shutter loop step {step}")
+        logger.debug(f"Triggering shutter loop step {step + 1}")
         
         
         for i, controls in enumerate(self.control_widgets):
@@ -148,7 +148,7 @@ class ShutterTab(QWidget, Ui_ShutterTab):
                 self.close_shutter.emit(self.shutters[i])
         
         # Display elapsed time for state
-        time_input_widget = getattr(self, f"step_time_{step}", None)
+        time_input_widget = getattr(self, f"step_time_{step + 1}", None)
         state_time = int(time_input_widget.value() * 1000) # Sec to ms
         logger.debug(f"State time is {state_time}")
         
