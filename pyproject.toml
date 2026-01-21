@@ -35,5 +35,4 @@ dev = [
 ]
 
 [project.scripts]
-lattice = "lattice.app:start"
-lattice-config = "lattice.configurator:start"
+lattice = "lattice.launcher:start"

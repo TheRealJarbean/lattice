@@ -4,8 +4,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QMutex, QEvent, QObject, QThread
 from PySide6.QtGui import QAction
-import pyqtgraph as pg
-import time
 import logging
 import os
 import serial
@@ -57,7 +55,7 @@ class FocusClearingFilter(QObject):
         return super().eventFilter(obj, event)
 CLEAR_FOCUS_FILTER = FocusClearingFilter()
 
-class MainWindow(QMainWindow):
+class MainAppWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         
@@ -242,7 +240,7 @@ class MainWindow(QMainWindow):
 
 def start():
     app = QApplication(sys.argv)# 
-    window = MainWindow()
+    window = MainAppWindow()
     window.show()
     app.exec()
 

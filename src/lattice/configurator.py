@@ -266,7 +266,7 @@ class BaudRateForm(QWidget):
         self.on_finish(baudrates)
 
 
-class MainWindow(QWidget):
+class ConfiguratorWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Device YAML Config Generator")
@@ -490,7 +490,7 @@ class MainWindow(QWidget):
     
 def start():
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = ConfiguratorWindow()
     window.resize(900, 500)
     window.show()
     sys.exit(app.exec())
