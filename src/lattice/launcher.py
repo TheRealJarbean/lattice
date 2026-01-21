@@ -25,8 +25,8 @@ class ModeChooser(QDialog):
         layout.setSpacing(12)
         layout.setContentsMargins(20, 20, 20, 20)
 
-        self.radio_main = QRadioButton("Main Application")
-        self.radio_config = QRadioButton("Configurator")
+        self.radio_main = QRadioButton("Start Lattice")
+        self.radio_config = QRadioButton("Open Device Configuration")
         self.radio_main.setChecked(True)
 
         layout.addSpacing(10)
