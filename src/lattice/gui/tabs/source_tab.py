@@ -157,7 +157,6 @@ class SourceTab(QWidget):
         self.process_variable_curves: dict[Source, pg.PlotCurveItem] = {}
         self.working_setpoint_curves: dict[Source, pg.PlotCurveItem] = {}
         for source in self.sources:
-            print(self.colors[source])
             self.process_variable_curves[source] = self.data_plot.plot(pen=pg.mkPen(self.colors[source], width=2))
             self.working_setpoint_curves[source] = self.data_plot.plot(pen=pg.mkPen(self.colors[source], width=2, style=Qt.DashLine))
         

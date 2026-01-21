@@ -285,7 +285,6 @@ class Source(QObject):
         self.write_data_by_key("setpoint", setpoint)
     
     def set_rate_limit(self, rate_limit):
-        print(f"Setting rate limit to {rate_limit}")
         self.data_mutex.lock()
         self.rate_limit = rate_limit
         self.data_mutex.unlock()
