@@ -36,6 +36,14 @@ jobs:
       - name: Build executable with pyinstaller
         run: uvx pyinstaller --onefile --name "Lattice" ./src/lattice/launcher.py
 
+      - name: Rename binary (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: mv dist/Lattice dist/Lattice-${{ runner.os }}
+      
+      - name: Rename binary (Windows)
+        if: runner.os == 'Windows'
+        run: mv dist/Lattice.exe dist/Lattice-Windows.exe
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
