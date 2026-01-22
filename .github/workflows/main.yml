@@ -13,7 +13,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     
     steps:
@@ -36,7 +36,7 @@ jobs:
       - name: Build executable with pyinstaller
         run: uvx pyinstaller --onefile --name "Lattice" ./src/lattice/launcher.py
 
-      - name: Rename binary (Linux/macOS)
+      - name: Rename binary (macOS)
         if: runner.os != 'Windows'
         run: mv dist/Lattice dist/Lattice-${{ runner.os }}
       
@@ -64,9 +64,26 @@ jobs:
       - name: Display downloaded files (debug)
         run: ls -R artifacts
 
+      - name: Compose release notes
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          NOTES_URL="https://github.com/${GITHUB_REPOSITORY}/commits/${TAG}"
+  
+          # Start fresh
+          > release-body.md
+  
+          # Optional manual intro
+          if [ -f .github/release-intro.md ]; then
+            cat .github/release-intro.md >> release-body.md
+            echo -e "\n---\n" >> release-body.md
+          fi
+  
+          # Always include the "full changelog" link
+          echo "**Full Changelog**: $NOTES_URL" >> release-body.md
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          body_path: release-body.md
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
           files: artifacts/**/*
