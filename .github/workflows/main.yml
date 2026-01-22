@@ -8,10 +8,14 @@ on:
 
 permissions:
   contents: write
-
+  
 jobs:
   build-and-release:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -42,4 +46,4 @@ jobs:
 
           # Attach files
           files: |
-            dist/Lattice.exe
+            dist/Lattice*
