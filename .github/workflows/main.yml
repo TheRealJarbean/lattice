@@ -33,28 +33,28 @@ jobs:
       - name: Install packages
         run: uv sync --no-dev
 
-      - name: Set binary name
+      - name: Compute binary name
+        id: naming
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME}"
 
           if [ "${{ runner.os }}" = "Windows" ]; then
             OS="windows"
-          elif [ "${{ runner.os }}" = "macOS" ]; then
+          else
             OS="macos"
           fi
 
           ARCH="amd64"
-
-          echo "BIN_NAME=lattice-${VERSION}-${OS}-${ARCH}" >> $GITHUB_ENV
+          echo "bin_name=lattice-${VERSION}-${OS}-${ARCH}" >> "$GITHUB_OUTPUT"
 
       - name: Build executable with pyinstaller
-        run: uvx pyinstaller --onefile --name "${BIN_NAME}" ./src/lattice/launcher.py
+        run: uvx pyinstaller --onefile --name "${{ steps.naming.outputs.bin_name }}" ./src/lattice/launcher.py
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: lattice-${{ matrix.os }}
+          name: ${{ steps.naming.outputs.bin_name }}
           path: dist/*
 
   release:
