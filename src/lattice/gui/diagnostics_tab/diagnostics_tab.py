@@ -4,7 +4,7 @@ import logging
 
 # Local imports
 from lattice.devices import PressureGauge, Shutter, Source
-from lattice.gui.widgets import ModbusLogWidget, SerialLogWidget
+from .log_widgets import ModbusLogWidget, SerialLogWidget
 
 logger = logging.getLogger(__name__)
 

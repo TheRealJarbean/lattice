@@ -5,7 +5,7 @@ import time
 
 # Local imports
 from lattice.devices.shutter import Shutter
-from lattice.gui.widgets import ShutterControlWidget
+from .shutter_control_widget import ShutterControlWidget
 from .ui_shutter_tab import Ui_ShutterTab
 
 logger = logging.getLogger(__name__)

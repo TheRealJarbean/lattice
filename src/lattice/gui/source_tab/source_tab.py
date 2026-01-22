@@ -21,8 +21,9 @@ import time
 
 # Local imports
 from lattice.devices.source import Source
-from lattice.gui.widgets import SourceControlWidget, InputModalWidget
+from lattice.gui.widgets import InputModalWidget
 from lattice.utils import config, START_TIME
+from .source_control_widget import SourceControlWidget
 
 logger = logging.getLogger(__name__)
 

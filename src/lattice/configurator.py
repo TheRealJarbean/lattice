@@ -3,11 +3,10 @@ import os
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QTableWidget, QTableWidgetItem,
-    QFileDialog, QStackedWidget, QHeaderView, QMenu, QSpinBox
+    QStackedWidget, QHeaderView, QMenu, QSpinBox
 )
 from PySide6.QtCore import Qt
 import yaml
-from collections import defaultdict
 
 
 class PressureForm(QWidget):

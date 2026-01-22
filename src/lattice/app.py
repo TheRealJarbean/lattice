@@ -14,13 +14,7 @@ from pymodbus import pymodbus_apply_logging_config
 # Local imports
 import lattice.utils.config as config
 from lattice.devices import Shutter, Source, PressureGauge
-from lattice.gui.tabs import (
-    PressureTab,
-    SourceTab,
-    ShutterTab,
-    RecipeTab,
-    DiagnosticsTab
-    )
+from lattice.gui import *
 from lattice.utils import EmailAlert
 
 # Set the log level based on env variable when program is run

@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QApplication
 )
 from PySide6.QtCore import (
-    QThread, 
     Qt,
     Signal,
     Slot,
@@ -24,8 +23,9 @@ import logging
 
 # Local imports
 from lattice.devices import PressureGauge, MockPressureGauge
-from lattice.gui.widgets import PressureControlWidget, StackedScrollingPlotWidget
+from lattice.gui.widgets import StackedScrollingPlotWidget
 from lattice.utils import timing
+from .pressure_control_widget import PressureControlWidget
 
 logger = logging.getLogger(__name__)
 
