@@ -10,7 +10,7 @@ permissions:
   contents: write
   
 jobs:
-  build-and-release:
+  build:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -36,14 +36,29 @@ jobs:
       - name: Build executable with pyinstaller
         run: uvx pyinstaller --onefile --name "Lattice" ./src/lattice/launcher.py
 
-      - name: Create Release
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lattice-${{ matrix.os }}
+          path: dist/*
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display downloaded files (debug)
+        run: ls -R artifacts
+
+      - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-
-          # Mark as prerelease if name contains 'beta', 'alpha', or 'rc'
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
-
-          # Attach files
-          files: |
-            dist/Lattice*
+          files: artifacts/**/*
