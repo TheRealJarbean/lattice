@@ -33,16 +33,23 @@ jobs:
       - name: Install packages
         run: uv sync --no-dev
 
-      - name: Build executable with pyinstaller
-        run: uvx pyinstaller --onefile --name "Lattice" ./src/lattice/launcher.py
+      - name: Set binary name
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
 
-      - name: Rename binary (macOS)
-        if: runner.os != 'Windows'
-        run: mv dist/Lattice dist/Lattice-${{ runner.os }}
-      
-      - name: Rename binary (Windows)
-        if: runner.os == 'Windows'
-        run: mv dist/Lattice.exe dist/Lattice-Windows.exe
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            OS="windows"
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            OS="macos"
+          fi
+
+          ARCH="amd64"
+
+          echo "BIN_NAME=lattice-${VERSION}-${OS}-${ARCH}" >> $GITHUB_ENV
+
+      - name: Build executable with pyinstaller
+        run: uvx pyinstaller --onefile --name "${BIN_NAME}" ./src/lattice/launcher.py
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
