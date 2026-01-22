@@ -30,7 +30,7 @@ jobs:
         run: uv sync --no-dev
 
       - name: Build executable with pyinstaller
-        run: uv run --no-sync pyinstaller --onefile --name "Lattice" ./src/lattice/launcher.py
+        run: uvx --no-sync pyinstaller --onefile --name "Lattice" ./src/lattice/launcher.py
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
