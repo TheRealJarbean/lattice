@@ -182,16 +182,17 @@ class MainAppWindow(QMainWindow):
             )
         
         # Set tab bar context menu
-        tab_widget = QTabWidget()
-        tab_widget.addTab(self.pressure_tab, "Pressure")
-        tab_widget.addTab(self.sources_tab, "Sources")
-        tab_widget.addTab(self.shutter_tab, "Shutters")
-        tab_widget.addTab(self.recipe_tab, "Recipe")
-        tab_widget.addTab(self.diagnostics_tab, "Diagnostics")
-        tab_widget.tabBar().setContextMenuPolicy(Qt.CustomContextMenu)
-        tab_widget.tabBar().customContextMenuRequested.connect(self.on_tab_context_menu)
+        self.tab_widget = QTabWidget()
+        self.tab_widget.addTab(self.pressure_tab, "Pressure")
+        self.tab_widget.addTab(self.sources_tab, "Sources")
+        self.tab_widget.addTab(self.shutter_tab, "Shutters")
+        self.tab_widget.addTab(self.recipe_tab, "Recipe")
+        self.tab_widget.addTab(self.diagnostics_tab, "Diagnostics")
+        self.tab_widget.setMovable(True)
+        self.tab_widget.tabBar().setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tab_widget.tabBar().customContextMenuRequested.connect(self.on_tab_context_menu)
 
-        self.setCentralWidget(tab_widget)
+        self.setCentralWidget(self.tab_widget)
     
     def on_tab_context_menu(self, point):
         tab_index = self.tab_widget.tabBar().tabAt(point)
