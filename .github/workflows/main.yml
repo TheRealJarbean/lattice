@@ -49,7 +49,9 @@ jobs:
           echo "bin_name=lattice-${VERSION}-${OS}-${ARCH}" >> "$GITHUB_OUTPUT"
 
       - name: Build executable with pyinstaller
-        run: uvx pyinstaller --onefile --name "${{ steps.naming.outputs.bin_name }}" ./src/lattice/launcher.py
+        run: |
+          uv add pyinstaller
+          uv run -- pyinstaller --onefile --name "${{ steps.naming.outputs.bin_name }}" ./src/lattice/launcher.py
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
