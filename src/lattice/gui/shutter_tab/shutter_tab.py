@@ -107,6 +107,11 @@ class ShutterTab(QWidget, Ui_ShutterTab):
                 font: 48pt "Segoe UI";
                 background-color: rgb(0, 255, 0);
                 """)
+            
+            # Close all shutters
+            for shutter in self.shutters:
+                self.close_shutter.emit(shutter)
+                
             return
         
         # If loop is not running
