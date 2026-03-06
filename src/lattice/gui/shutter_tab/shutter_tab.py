@@ -11,10 +11,6 @@ from .ui_shutter_tab import Ui_ShutterTab
 logger = logging.getLogger(__name__)
 
 class ShutterTab(QWidget, Ui_ShutterTab):
-    open_shutter = Signal(Shutter)
-    close_shutter = Signal(Shutter)
-    send_command = Signal(Shutter, str) # Shutter reference, command
-
     def __init__(self, shutters: list[Shutter]):
         super().__init__()
         self.setupUi(self)
@@ -24,15 +20,9 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         #########
         # SETUP #
         #########
-            
-        # The on_shutter_state_change function will handle any gui
-        # changes that need to be made based on shutter state
-        # The index of the shutter is baked to the connection in for reference later
+
         for i, shutter in enumerate(self.shutters):
-            shutter.is_open_changed.connect(self.on_state_change)
-            self.open_shutter.connect(shutter.open)
-            self.close_shutter.connect(shutter.close)
-            self.send_command.connect(shutter.send_custom_command)
+            shutter.is_open_changed.connect(lambda is_open, s=shutter: self.on_state_change(s, is_open))
         
         self.current_step = 0
         self.loop_step_timer = QTimer()
@@ -53,7 +43,7 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         controls_layout = getattr(self, "shutter_controls_layout", None)
         self.control_widgets: list[ShutterControlWidget] = []
         for shutter in self.shutters:
-            widget = ShutterControlWidget(shutter.name, 6)
+            widget = ShutterControlWidget(shutter.name, num_steps=6) # Number of steps is not currently variable on UI side
             self.control_widgets.append(widget)
             controls_layout.addWidget(widget)
             
@@ -110,7 +100,7 @@ class ShutterTab(QWidget, Ui_ShutterTab):
             
             # Close all shutters
             for shutter in self.shutters:
-                self.close_shutter.emit(shutter)
+                shutter.close()
                 
             return
         
@@ -148,9 +138,9 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         for i, controls in enumerate(self.control_widgets):
             is_open = controls.step_state_buttons[step].property("is_open")
             if is_open:
-                self.open_shutter.emit(self.shutters[i])
+                self.shutters[i].open()
             else:
-                self.close_shutter.emit(self.shutters[i])
+                self.shutters[i].close()
         
         # Display elapsed time for state
         time_input_widget = getattr(self, f"step_time_{step + 1}", None)
@@ -238,13 +228,13 @@ class ShutterTab(QWidget, Ui_ShutterTab):
             
     def on_output_button_click(self):
         button: QPushButton = self.sender()
-        is_open = button.property("is_open")
-        idx = button.property("idx")
+        is_open: bool = button.property("is_open")
+        idx: int = button.property("idx")
             
         if is_open:
-            self.close_shutter.emit(self.shutters[idx])
+            self.shutters[idx].close()
         else:
-            self.open_shutter.emit(self.shutters[idx])
+            self.shutters[idx].open()
             
         # Refresh button style
         button.style().unpolish(button)

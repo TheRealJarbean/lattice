@@ -7,6 +7,52 @@ import logging
 logger = logging.getLogger(__name__)
 
 class PressureGauge(QObject):
+    _toggle_on_off = Signal()
+    _send_command = Signal()
+    _start_polling = Signal(int) # Polling interval ms
+    _stop_polling = Signal()
+    pressure_changed = Signal(float) # Pressure
+    rate_changed = Signal(float) # Rate
+    is_on_changed = Signal(bool) # State
+
+    def __init__(self, name, address, ser: serial.Serial, serial_mutex: QMutex, worker_thread: QThread):
+        super().__init__()
+        self.name = name
+        self.address = address
+        self.worker = PressureGaugeWorker(name, address, ser, serial_mutex)
+
+        self._toggle_on_off.connect(self.worker.toggle_on_off)
+        self._send_command.connect(self.worker.send_custom_command)
+        self._start_polling.connect(self.worker.start_polling)
+        self._stop_polling.connect(self.worker.stop_polling)
+        self.worker.pressure_changed.connect(self._pressure_changed)
+        self.worker.rate_changed.connect(self._rate_changed)
+        self.worker.is_on.connect(self._is_on_changed)
+
+        self.worker.moveToThread(worker_thread)
+
+    def toggle_on_off(self):
+        self._toggle_on_off.emit()
+
+    def send_command(self, command: str):
+        self._send_command.emit(command)
+
+    def start_polling(self, polling_interval_ms: int):
+        self._start_polling.emit(polling_interval_ms)
+    
+    def stop_polling(self):
+        self._stop_polling.emit()
+
+    def _pressure_changed(self, pressure: float):
+        self.pressure_changed.emit(pressure)
+
+    def _rate_changed(self, rate: float):
+        self.rate_changed.emit(rate)
+
+    def _is_on_changed(self, is_on: bool):
+        self.is_on_changed.emit(is_on)
+
+class PressureGaugeWorker(QObject):
     pressure_changed = Signal(float, QObject) # Value, self ref
     rate_changed = Signal(float, QObject) # Value, self ref
     is_on_changed = Signal(bool, QObject) # State, self ref
@@ -87,10 +133,7 @@ class PressureGauge(QObject):
         self.send_command(f'#0031{address}')
     
     @Slot()
-    def start_polling(self, gauge, polling_interval_ms: int):
-        if gauge is not self:
-            return
-        
+    def start_polling(self, polling_interval_ms: int):
         self.data_mutex.lock()
         logger.debug(f"Starting polling for gauge {self.name}")
         self.polling_interval_ms = polling_interval_ms
@@ -100,9 +143,6 @@ class PressureGauge(QObject):
     
     @Slot()
     def stop_polling(self, gauge):
-        if gauge is not self:
-            return
-        
         self.data_mutex.lock()
         logger.debug(f"Stopping polling for gauge {self.name}")
         self.is_polling = False

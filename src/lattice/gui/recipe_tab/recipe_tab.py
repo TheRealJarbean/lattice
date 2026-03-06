@@ -39,7 +39,7 @@ class WheelEventFilter(QObject):
 WHEEL_FILTER = WheelEventFilter()
 
 class RecipeTab(QWidget, Ui_RecipeTab):
-    def __init__(self, gauges: PressureGauge, sources: Source, shutters: Shutter):
+    def __init__(self, gauges: list[PressureGauge], sources: list[Source], shutters: list[Shutter]):
         super().__init__()
         self.setupUi(self)
 

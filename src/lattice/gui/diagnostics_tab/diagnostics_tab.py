@@ -9,7 +9,7 @@ from .log_widgets import ModbusLogWidget, SerialLogWidget
 logger = logging.getLogger(__name__)
 
 class DiagnosticsTab(QWidget):
-    def __init__(self, gauges: PressureGauge, sources: Source, shutters: Shutter):
+    def __init__(self, gauges: list[PressureGauge], sources: list[Source], shutters: list[Shutter]):
         super().__init__()
         self.gauges = gauges
         self.sources = sources
@@ -44,23 +44,27 @@ class DiagnosticsTab(QWidget):
         
         # Connect signals
         for gauge in self.gauges:
-            gauge.new_serial_data.connect(self.pressure_serial_log.append_data)
-            self.pressure_serial_log.send_command.connect(lambda _, cmd, g=gauge: g.send_custom_command(cmd))
+            gauge.new_serial_data.connect(
+                lambda data, name=gauge.name: self.pressure_serial_log.append_data(name, data)
+            )
+            self.pressure_serial_log.send_command.connect(
+                lambda _, cmd, g=gauge: g.send_command(cmd)
+            )
         
         self.source_serial_log.read_modbus.connect(
             lambda name, address: self.source_dict[name].read_data_by_address(address)
-        )
+            )
         self.source_serial_log.write_modbus.connect(
             lambda name, address, value: self.source_dict[name].write_data_by_address(address, value)
-        )
+            )
         for source in self.sources:
             source.new_modbus_data.connect(self.source_serial_log.append_data)
         
         self.shutter_serial_log.send_command.connect(
-            lambda name, cmd: self.send_shutter_command.emit(self.shutter_dict[name], cmd)
-        )
+            lambda name, cmd: self.shutter_dict[name].send_command(cmd)
+            )
         for shutter in self.shutters:
-            shutter.new_serial_data.connect(self.shutter_serial_log.append_data)
+            shutter.new_serial_data.connect(lambda data, name=shutter.name: self.shutter_serial_log.append_data(name, data))
         
         # Create main layout
         layout = QVBoxLayout()

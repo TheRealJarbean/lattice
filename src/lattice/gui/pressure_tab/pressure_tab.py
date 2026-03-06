@@ -30,8 +30,8 @@ from .pressure_control_widget import PressureControlWidget
 logger = logging.getLogger(__name__)
 
 class PressureTab(QWidget):
-    start_polling = Signal(PressureGauge, int) # Gauge, interval_ms
-    stop_polling = Signal(PressureGauge) # Gauge
+    start_polling = Signal(int) # interval ms
+    stop_polling = Signal()
     
     def __init__(self, pressure_gauges: list[PressureGauge]):
         super().__init__()
@@ -45,12 +45,7 @@ class PressureTab(QWidget):
         self.pressure_data = {}
         for gauge in self.pressure_gauges:
             self.pressure_data[gauge] = deque(maxlen=7200) # 3 hours of data at polling rate of 500ms
-            gauge.pressure_changed.connect(self.on_new_pressure_data)
-        
-        # Connect start/stop polling signals
-        for gauge in self.pressure_gauges:
-            self.start_polling.connect(gauge.start_polling)
-            self.stop_polling.connect(gauge.stop_polling)
+            gauge.pressure_changed.connect(lambda data, g=gauge: self.on_new_pressure_data(data, g))
             
         #####################
         # CONFIGURE WIDGETS #
@@ -82,7 +77,7 @@ class PressureTab(QWidget):
             gauge.is_on_changed.connect(controls.update_on_off_text)
             
             # Connect power toggle button action
-            controls.power_toggle_button.clicked.connect(gauge.toggle_on_off)
+            controls.power_toggle_button.clicked.connect(lambda g=gauge: g.toggle_on_off)
         
         # Create pressure data plot
         self.pressure_plot = StackedScrollingPlotWidget(
@@ -146,7 +141,7 @@ class PressureTab(QWidget):
         
         # Start polling for pressure data
         for gauge in self.pressure_gauges:
-            self.start_polling.emit(gauge, 1000)
+            gauge.start_polling(1000)
 
     @Slot(PressureGauge, float) # Gauge ref, Value
     def on_new_pressure_data(self, data, gauge: PressureGauge):

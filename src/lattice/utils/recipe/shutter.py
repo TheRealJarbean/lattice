@@ -19,16 +19,9 @@ WHEEL_FILTER = WheelEventFilter()
 
 # SHUTTER action
 class ShutterAction(RecipeAction):
-    open_shutter = Signal(Shutter)
-    close_shutter = Signal(Shutter)
-    
     def __init__(self, shutter_dict: dict[str, Shutter]):
         super().__init__()
         self.shutters = shutter_dict
-        
-        for shutter in self.shutters.values():
-            self.open_shutter.connect(shutter.open)
-            self.close_shutter.connect(shutter.close)
         
     def run(self, recipe_table: QTableWidget, row: int):
         for col in range(1, recipe_table.columnCount()):
@@ -39,10 +32,10 @@ class ShutterAction(RecipeAction):
                 continue
             
             if widget.currentText() == "OPEN":
-                self.open_shutter.emit(self.shutters[shutter_name])
+                self.shutters[shutter_name].open()
                 
             if widget.currentText() == "CLOSE":
-                self.close_shutter.emit(self.shutters[shutter_name])
+                self.shutters[shutter_name].open()
                 
         self.can_continue.emit()
     

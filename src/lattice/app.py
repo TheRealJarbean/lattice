@@ -67,6 +67,7 @@ class MainAppWindow(QMainWindow):
         ##################
         
         self.pressure_gauges: list[PressureGauge] = []
+        self.pressure_thread = QThread()
 
         # Populate pressure gauge list from config file
         for pressure_config in config.HARDWARE_CONFIG['devices']['pressure'].values():
@@ -83,13 +84,9 @@ class MainAppWindow(QMainWindow):
                     name=gauge['name'], 
                     address=gauge['address'],
                     ser=ser,
-                    serial_mutex=mutex
+                    serial_mutex=mutex,
+                    worker_thread=self.pressure_thread,
                     ))
-        
-        # Move pressure gauges to dedicated thread
-        self.pressure_thread = QThread()
-        for gauge in self.pressure_gauges:
-            gauge.moveToThread(self.pressure_thread)
 
         # Start the pressure thread event loop
         self.pressure_thread.start()
@@ -136,6 +133,7 @@ class MainAppWindow(QMainWindow):
         #################
         
         self.shutters: list[Shutter] = []
+        self.shutter_thread = QThread()
         
         for shutter_config in config.HARDWARE_CONFIG['devices']['shutters'].values():
             ser = serial.Serial(
@@ -150,14 +148,10 @@ class MainAppWindow(QMainWindow):
                 name=shutter['name'], 
                 address=shutter['address'], 
                 ser=ser, 
-                serial_mutex=serial_mutex
+                serial_mutex=serial_mutex,
+                thread=self.shutter_thread,
                 ) for shutter in shutter_config['connections']])
-        
-        # Move shutters to dedicated thread
-        self.shutter_thread = QThread()
-        for shutter in self.shutters:
-            shutter.moveToThread(self.shutter_thread)
-
+            
         # Start the shutter thread event loop
         self.shutter_thread.start()
         

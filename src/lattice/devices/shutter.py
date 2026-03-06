@@ -1,4 +1,4 @@
-from PySide6.QtCore import QMutex, QObject, Signal, QMutexLocker, Slot
+from PySide6.QtCore import QMutex, QObject, Signal, QThread, Slot
 import time
 import logging
 import serial
@@ -6,6 +6,43 @@ import serial
 logger = logging.getLogger(__name__)
 
 class Shutter(QObject):
+    _open = Signal()
+    _close = Signal()
+    _send_command = Signal(str) # Command
+    is_open_changed = Signal(bool) # State
+    new_serial_data = Signal(str) # Data
+
+    def __init__(self, name: str, address: int, ser: serial.Serial, serial_mutex: QMutex, worker_thread: QThread):
+        super().__init__()
+
+        self.name = name
+        self.address = address
+        self.worker = ShutterWorker(name, address, ser, serial_mutex)
+
+        self._open.connect(self.worker.open)
+        self._close.connect(self.worker.close)
+        self._send_command.connect(self.worker.send_custom_command)
+        self.worker.is_open_changed.connect(self._is_open_changed)
+        self.worker.new_serial_data.connect(self._new_serial_data)
+
+        self.worker.moveToThread(worker_thread)
+
+    def open(self):
+        self._open.emit()
+
+    def close(self):
+        self._close.emit()
+
+    def send_command(self, command: str):
+        self._send_command.emit(command)
+
+    def _is_open_changed(self, is_open: bool):
+        self.is_open_changed.emit(is_open)
+
+    def _new_serial_data(self, data):
+        self.new_serial_data.emit(data)
+
+class ShutterWorker(QObject):
     is_open_changed = Signal(object, bool) # Reference to self, is_open
     new_serial_data = Signal(str, str) # Name, data
     
@@ -21,6 +58,7 @@ class Shutter(QObject):
     def send_command(self, cmd):
         """Send a message to the serial port."""
         self.serial_mutex.lock()
+        
         if self.ser and self.ser.is_open:
             try:
                 self.ser.write(f"{cmd}\r\n".encode('utf-8'))
@@ -67,10 +105,7 @@ class Shutter(QObject):
         self.is_open_changed.emit(self, False)
 
     @Slot()
-    def open(self, shutter=None):
-        if shutter is not self:
-            return
-
+    def open(self):
         self.data_mutex.lock()
         enabled = self.enabled
         address = self.address
@@ -86,10 +121,7 @@ class Shutter(QObject):
         self.is_open_changed.emit(self, True)
 
     @Slot()
-    def close(self, shutter=None):
-        if shutter is not self:
-            return
-        
+    def close(self):
         self.data_mutex.lock()
         enabled = self.enabled
         address = self.address
@@ -105,10 +137,7 @@ class Shutter(QObject):
         self.is_open_changed.emit(self, False)
         
     @Slot()
-    def send_custom_command(self, command, shutter=None):
-        if shutter is not self:
-            return
-        
+    def send_custom_command(self, command):
         self.data_mutex.lock()
         enabled = self.enabled
         address = self.address
