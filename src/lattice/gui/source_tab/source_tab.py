@@ -33,12 +33,6 @@ class TimeAxis(pg.AxisItem):
         return [str(timedelta(seconds=v)) for v in values]
 
 class SourceTab(QWidget):
-    start_polling = Signal(Source, int) # Source, interval_ms
-    stop_polling = Signal(Source) # Source
-    set_setpoint = Signal(Source, float) # Source, setpoint
-    set_rate_limit = Signal(Source, float) # Source, rate_limit
-    set_safety = Signal(Source, float, float, float) # Source, rate_limit, from, to
-
     def __init__(self, sources: list[Source]):
         super().__init__()
         
@@ -59,14 +53,6 @@ class SourceTab(QWidget):
         for source in self.sources:
             source.process_variable_changed.connect(self.on_new_process_variable)
             source.working_setpoint_changed.connect(self.on_new_working_setpoint)
-
-        # Connect own signals
-        for source in self.sources:
-            self.start_polling.connect(source.start_polling)
-            self.stop_polling.connect(source.stop_polling)
-            self.set_setpoint.connect(source.set_setpoint)
-            self.set_rate_limit.connect(source.set_rate_limit)
-            self.set_safety.connect(source.set_rate_limit_safety)
             
         #########################
         # CONTROL WIDGET CONFIG #
