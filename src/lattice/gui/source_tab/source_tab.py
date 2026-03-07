@@ -261,7 +261,7 @@ class SourceTab(QWidget):
     
     def open_pid_input_modal(self, source: Source):
         pid_input_settings = ["PB", "TI", "TD"] # TODO: Ask what these should be
-        current_values = source.get_pid()
+        current_values = source.read_pid()
         input_modal = InputModalWidget(
             pid_input_settings, 
             defaults=current_values, 
@@ -277,7 +277,7 @@ class SourceTab(QWidget):
             pid_td = values["TD"]
             
             # Apply changes to source
-            source.set_pid(
+            source.write_pid(
                 pid_pb=pid_pb,
                 pid_ti=pid_ti,
                 pid_td=pid_td

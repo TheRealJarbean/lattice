@@ -7,13 +7,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 class PressureGauge(QObject):
+    # Internal signals
     _toggle_on_off = Signal()
     _send_command = Signal()
     _start_polling = Signal(int) # Polling interval ms
     _stop_polling = Signal()
-    pressure_changed = Signal(float) # Pressure
-    rate_changed = Signal(float) # Rate
-    is_on_changed = Signal(bool) # State
+
+    # External signals
+    pressure_changed = Signal(float)
+    rate_changed = Signal(float)
+    is_on_changed = Signal(bool)
+    new_serial_data = Signal(str) # Message
 
     def __init__(self, name, address, ser: serial.Serial, serial_mutex: QMutex, worker_thread: QThread):
         super().__init__()
@@ -27,11 +31,13 @@ class PressureGauge(QObject):
         self._stop_polling.connect(self.worker.stop_polling)
         self.worker.pressure_changed.connect(self._pressure_changed)
         self.worker.rate_changed.connect(self._rate_changed)
-        self.worker.is_on.connect(self._is_on_changed)
+        self.worker.is_on_changed.connect(self._is_on_changed)
+        self.worker.new_serial_data.connect(self._new_serial_data)
 
         self.worker.moveToThread(worker_thread)
 
     def toggle_on_off(self):
+        logger.debug(f"Dispatcher running in {QThread.currentThread()}!")
         self._toggle_on_off.emit()
 
     def send_command(self, command: str):
@@ -51,6 +57,9 @@ class PressureGauge(QObject):
 
     def _is_on_changed(self, is_on: bool):
         self.is_on_changed.emit(is_on)
+
+    def _new_serial_data(self, message: str):
+        self.new_serial_data.emit(message)
 
 class PressureGaugeWorker(QObject):
     pressure_changed = Signal(float, QObject) # Value, self ref
@@ -105,6 +114,8 @@ class PressureGaugeWorker(QObject):
     
     @Slot()
     def toggle_on_off(self):
+        logger.debug(f"Worker running in {QThread.currentThread()}!")
+
         self.data_mutex.lock()
         is_on = self.is_on
         address = self.address

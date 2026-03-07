@@ -29,7 +29,7 @@ class WaitUntilSetpointAction(WaitAction):
         values_dict = self.gather_values_dict(recipe_table, row)
         for source_name, value in values_dict.items():
             if value is not None:
-                self.previous_setpoints[source_name] = self.sources[source_name].get_setpoint()
+                self.previous_setpoints[source_name] = self.sources[source_name].read_setpoint()
                 self.target_setpoints[source_name] = float(value)
                 self.sources[source_name].set_setpoint(float(value))
                 self.sources_checking.add(source_name)

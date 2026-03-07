@@ -96,6 +96,7 @@ class MainAppWindow(QMainWindow):
         ################
         
         self.sources: list[Source] = []
+        self.source_thread = QThread()
         
         if config.PARAMETER_CONFIG['sources']['safety'] is None:
             config.PARAMETER_CONFIG['sources']['safety'] = {}
@@ -117,13 +118,9 @@ class MainAppWindow(QMainWindow):
                     address_set=device['address_set'],
                     safety_settings=safety_settings.get(device['name'], {}),
                     client=client,
-                    serial_mutex=mutex
+                    serial_mutex=mutex,
+                    worker_thread=self.source_thread
                     ))
-        
-        # Move sources to dedicated thread
-        self.source_thread = QThread()
-        for source in self.sources:
-            source.moveToThread(self.source_thread)
 
         # Start the source thread event loop
         self.source_thread.start()
@@ -149,7 +146,7 @@ class MainAppWindow(QMainWindow):
                 address=shutter['address'], 
                 ser=ser, 
                 serial_mutex=serial_mutex,
-                thread=self.shutter_thread,
+                worker_thread=self.shutter_thread,
                 ) for shutter in shutter_config['connections']])
             
         # Start the shutter thread event loop

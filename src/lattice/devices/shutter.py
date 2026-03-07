@@ -6,9 +6,12 @@ import serial
 logger = logging.getLogger(__name__)
 
 class Shutter(QObject):
+    # Internal signals
     _open = Signal()
     _close = Signal()
     _send_command = Signal(str) # Command
+    
+    # External signals
     is_open_changed = Signal(bool) # State
     new_serial_data = Signal(str) # Data
 
