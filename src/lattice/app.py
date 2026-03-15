@@ -55,12 +55,35 @@ class MainAppWindow(QMainWindow):
         
         # Change default window size
         self.resize(1400, 900)
+
+        # Set window title
+        self.setWindowTitle("Lattice")
         
         # Configure email alerts
         self.alert = EmailAlert(config.ALERT_CONFIG['recipients'])
         
         # Apply focus clearing filter
         QApplication.instance().installEventFilter(CLEAR_FOCUS_FILTER)
+
+        ##################
+        # MENU BAR SETUP #
+        ##################
+
+        menubar = self.menuBar()
+        menubar.setStyleSheet("""
+        QMenuBar::item {
+            padding: 6px 14px;
+        }
+                              
+        QMenuBar::item:selected {
+            background: #555;
+        }       
+        """)
+
+        self.prefs = PreferencesWindow(self)
+        preferences_action = QAction("Preferences", self)
+        preferences_action.triggered.connect(self.prefs.exec)
+        menubar.addAction(preferences_action)
         
         ##################
         # PRESSURE SETUP #

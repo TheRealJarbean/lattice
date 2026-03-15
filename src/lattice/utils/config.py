@@ -51,6 +51,12 @@ class Config:
 
     def get_config_file(self, filename: str):
         return self.get_config_dir() / filename
+    
+PREFERENCES_DEFAULT = {
+    "pressure_warning_threshold": 1e-5,
+    "display_time_as_local_time": True,
+}
+PREFERENCES = Config('preferences.yaml', PREFERENCES_DEFAULT)
 
 # Load hardware config or defaults
 HARDWARE_DEFAULT = {

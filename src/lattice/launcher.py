@@ -55,12 +55,10 @@ def start():
         sys.exit(0)  # user closed dialog → exit
 
     mode = chooser.chosen_mode()
-
     if mode == "main":
         window = MainAppWindow()
     else:
         window = ConfiguratorWindow()
-
     window.show()
 
     sys.exit(app.exec())
