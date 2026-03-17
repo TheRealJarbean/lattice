@@ -457,6 +457,9 @@ class SourceWorker(QObject):
 
     @Slot(float)
     def write_setpoint(self, setpoint: float):
+        if setpoint > self.max_setpoint:
+            return
+        
         self._write_data_by_key('setpoint', setpoint)
 
     @Slot(float)

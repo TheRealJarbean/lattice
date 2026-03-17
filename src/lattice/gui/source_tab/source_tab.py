@@ -302,6 +302,10 @@ class SourceTab(QWidget):
                 )
             source.set_max_setpoint(max_sp)
             source.set_stability_tolerance(stability_tolerance)
+
+            # Apply max setpoint limit to setpoint input
+            for controls in self.control_widgets:
+                controls.input_setpoint.setMaximum(max_sp)
             
             # Save changes to config since safety settings are not stored on-device
             # Ensure source entry exists
