@@ -1,4 +1,5 @@
 import sys
+import traceback
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -65,7 +66,8 @@ def start():
         sys.exit(app.exec())
     
     except Exception as e:
-        print(f"Something went wrong and Lattice Launcher failed to start:\n{e}\n")
+        print("Something went wrong and Lattice Launcher failed to start:")
+        traceback.print_exc()
         input("Press Enter to exit...")
 
 
