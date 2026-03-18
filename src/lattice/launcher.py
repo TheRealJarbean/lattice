@@ -48,20 +48,25 @@ class ModeChooser(QDialog):
 
 
 def start():
-    app = QApplication(sys.argv)
+    try:
+        app = QApplication(sys.argv)
 
-    chooser = ModeChooser()
-    if chooser.exec() != QDialog.Accepted:
-        sys.exit(0)  # user closed dialog → exit
+        chooser = ModeChooser()
+        if chooser.exec() != QDialog.Accepted:
+            sys.exit(0)  # user closed dialog → exit
 
-    mode = chooser.chosen_mode()
-    if mode == "main":
-        window = MainAppWindow()
-    else:
-        window = ConfiguratorWindow()
-    window.show()
+        mode = chooser.chosen_mode()
+        if mode == "main":
+            window = MainAppWindow()
+        else:
+            window = ConfiguratorWindow()
+        window.show()
 
-    sys.exit(app.exec())
+        sys.exit(app.exec())
+    
+    except Exception as e:
+        print(f"Something went wrong and Lattice Launcher failed to start:\n{e}\n")
+        input("Press Enter to exit...")
 
 
 if __name__ == "__main__":
