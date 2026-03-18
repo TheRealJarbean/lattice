@@ -6,16 +6,19 @@ from PySide6.QtCore import Qt, QMutex, QEvent, QObject, QThread
 from PySide6.QtGui import QAction
 import logging
 import os
+import sys
 import serial
+import webbrowser
+import shutil
 from pathlib import Path
 from pymodbus.client import ModbusSerialClient as ModbusClient
 from pymodbus import pymodbus_apply_logging_config
 
 # Local imports
-import lattice.utils.config as config
+from lattice.utils import config
+from lattice import definitions
 from lattice.devices import Shutter, Source, PressureGauge
 from lattice.gui import *
-from lattice.utils import EmailAlerter
 
 # Set the log level based on env variable when program is run
 # Determines which logging statements are printed to console
@@ -81,6 +84,10 @@ class MainAppWindow(QMainWindow):
         preferences_action = QAction("Preferences", self)
         preferences_action.triggered.connect(self.prefs.exec)
         menubar.addAction(preferences_action)
+
+        docs_action = QAction("Docs", self)
+        docs_action.triggered.connect(self.open_docs)
+        menubar.addAction(docs_action)
         
         ##################
         # PRESSURE SETUP #
@@ -243,6 +250,31 @@ class MainAppWindow(QMainWindow):
             
         # Show the popped out tab
         tab.show()
+
+    def open_docs(self):
+        is_bundled = getattr(sys, "frozen", False)
+        if is_bundled:
+            # PyInstaller bundle
+            site_path = Path(sys._MEIPASS) / "site"
+        else:
+            # running normally, assume site is on same level as src
+            site_path = definitions.ROOT_DIR / ".." / ".." / "site"
+
+        index_file = site_path / "index.html"
+        if not index_file.exists():
+            logger.error("Couldn't find local docs!")
+            return
+        
+        # Force specific browser on bundled linux so kde-open doesn't explode
+        if is_bundled and sys.platform.startswith("linux"):
+            browser_path = shutil.which("librewolf") or shutil.which("firefox") or shutil.which("chromium") or shutil.which("google-chrome")
+            if browser_path:
+                webbrowser.get(browser_path).open(index_file.as_uri())
+            else:
+                logger.error("No supported browser found! (Supported browsers: librewolf, firefox, chromium, google chrome)")
+            return
+            
+        webbrowser.open(index_file.as_uri())
 
 def start():
     app = QApplication(sys.argv)# 
