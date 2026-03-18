@@ -13,7 +13,7 @@ from PySide6.QtCore import QThread, QTimer, Qt, Signal
 from PySide6.QtGui import QFont
 from collections import deque
 from functools import partial
-from datetime import timedelta
+from datetime import timedelta, datetime
 import pyqtgraph as pg
 import numpy as np
 import logging
@@ -22,7 +22,7 @@ import time
 # Local imports
 from lattice.devices.source import Source
 from lattice.gui.widgets import InputModalWidget
-from lattice.utils import config, START_TIME
+from lattice.utils import config, START_TIME, duration_to_str
 from .source_control_widget import SourceControlWidget
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # Custom axis for time in plots
 class TimeAxis(pg.AxisItem):
     def tickStrings(self, values, scale, spacing):
-        return [str(timedelta(seconds=v)) for v in values]
+        return [duration_to_str(v) for v in values]
 
 class SourceTab(QWidget):
     def __init__(self, sources: list[Source]):
@@ -158,6 +158,7 @@ class SourceTab(QWidget):
         # Add cursor tracking line
         self.cursor_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('y', width=1))
         self.cursor_label = pg.TextItem(color="y")
+        self.cursor_label.setFont(QFont("SegoeUI", 18))
 
         self.data_plot.plotItem.addItem(self.cursor_line, ignoreBounds=True)
         self.data_plot.plotItem.addItem(self.cursor_label, ignoreBounds=True)
@@ -399,10 +400,16 @@ class SourceTab(QWidget):
         self.cursor_line.show()
 
         # Label at top of plot
-        time_str = str(timedelta(seconds=x))
-        time_str = time_str[:time_str.index('.') + 3] # Truncate to two decimals
-        (_, _), (ymin, ymax) = target_vb.viewRange()
+        time_str = duration_to_str(x)
+
+        (xmin, xmax), (_, ymax) = target_vb.viewRange()
         self.cursor_label.setText(f"t = {time_str}")
+
+        if x > xmax - ((xmax - xmin) * 0.014 * len(time_str)): # rough estimate of right border
+            self.cursor_label.setAnchor((1, 0)) # right-align
+        else:
+            self.cursor_label.setAnchor((0, 0)) # left-align
+        
         self.cursor_label.setPos(x, ymax)
         self.cursor_label.show()
 

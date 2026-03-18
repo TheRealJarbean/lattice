@@ -37,7 +37,6 @@ class PressureGauge(QObject):
         self.worker.moveToThread(worker_thread)
 
     def toggle_on_off(self):
-        logger.debug(f"Dispatcher running in {QThread.currentThread()}!")
         self._toggle_on_off.emit()
 
     def send_command(self, command: str):

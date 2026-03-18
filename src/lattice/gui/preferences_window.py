@@ -75,7 +75,7 @@ class PreferencesWindow(QDialog):
         checkbox = QCheckBox()
         checkbox.setChecked(config.PREFERENCES["display_time_as_local_time"])
         self.settings_to_inputs_map["display_time_as_local_time"] = lambda: checkbox.isChecked()
-        general_layout.addRow("Display Time as Local Time:", checkbox)
+        general_layout.addRow("Display Time as Local Time", checkbox)
 
         # Apply and cancel buttons
         self.apply_button = QPushButton("Apply")
