@@ -29,7 +29,7 @@ class Config:
                     dict2[key] = dict1[key]
                     continue
 
-                if isinstance(dict2[key], dict):
+                if isinstance(dict1[key], dict) and isinstance(dict2[key], dict):
                     if dict1[key]:
                         copy_missing_keys(dict1[key], dict2[key])
 
