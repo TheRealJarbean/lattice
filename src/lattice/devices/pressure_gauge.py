@@ -5,7 +5,7 @@ import re
 import logging
 
 # Local imports
-from lattice.utils import config
+from lattice.utils.config import AppConfig
 from lattice.definitions import ALERTER
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ class PressureGauge(QObject):
         self._stop_polling.emit()
 
     def _pressure_changed(self, pressure: float):
-        threshold = config.PREFERENCES['pressure_warning_threshold']
+        threshold = AppConfig.PREFERENCES['pressure_warning_threshold']
         if pressure > threshold:
             ALERTER.send_email(
                 "ALERT! HIGH PRESSURE DETECTED!",

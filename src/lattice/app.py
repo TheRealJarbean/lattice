@@ -15,7 +15,7 @@ from pymodbus.client import ModbusSerialClient as ModbusClient
 from pymodbus import pymodbus_apply_logging_config
 
 # Local imports
-from lattice.utils import config
+from lattice.utils.config import AppConfig
 from lattice import definitions
 from lattice.devices import Shutter, Source, PressureGauge
 from lattice.gui import *
@@ -97,7 +97,7 @@ class MainAppWindow(QMainWindow):
         self.pressure_thread = QThread()
 
         # Populate pressure gauge list from config file
-        for pressure_config in config.HARDWARE_CONFIG['devices']['pressure'].values():
+        for pressure_config in AppConfig.HARDWARE['devices']['pressure'].values():
             ser = serial.Serial(
                 port=pressure_config['serial']['port'], 
                 baudrate=pressure_config['serial']['baudrate'],
@@ -125,10 +125,10 @@ class MainAppWindow(QMainWindow):
         self.sources: list[Source] = []
         self.source_thread = QThread()
         
-        if config.PARAMETER_CONFIG['sources']['safety'] is None:
-            config.PARAMETER_CONFIG['sources']['safety'] = {}
-        safety_settings = config.PARAMETER_CONFIG['sources']['safety']
-        for source_config in config.HARDWARE_CONFIG['devices']['sources'].values():
+        if AppConfig.PARAMETER['sources']['safety'] is None:
+            AppConfig.PARAMETER['sources']['safety'] = {}
+        safety_settings = AppConfig.PARAMETER['sources']['safety']
+        for source_config in AppConfig.HARDWARE['devices']['sources'].values():
             logger.debug(source_config)
             logger.debug(source_config['serial']['port'])
             client = ModbusClient(
@@ -159,7 +159,7 @@ class MainAppWindow(QMainWindow):
         self.shutters: list[Shutter] = []
         self.shutter_thread = QThread()
         
-        for shutter_config in config.HARDWARE_CONFIG['devices']['shutters'].values():
+        for shutter_config in AppConfig.HARDWARE['devices']['shutters'].values():
             ser = serial.Serial(
                 port=shutter_config['serial']['port'], 
                 baudrate=shutter_config['serial']['baudrate'],
@@ -269,12 +269,12 @@ class MainAppWindow(QMainWindow):
         if is_bundled and sys.platform.startswith("linux"):
             browser_path = shutil.which("librewolf") or shutil.which("firefox") or shutil.which("chromium") or shutil.which("google-chrome")
             if browser_path:
-                webbrowser.get(browser_path).open(index_file.as_uri())
+                webbrowser.get(browser_path).open(f"file:///{index_file.resolve()}")
             else:
                 logger.error("No supported browser found! (Supported browsers: librewolf, firefox, chromium, google chrome)")
             return
             
-        webbrowser.open(index_file.as_uri())
+        webbrowser.open(f"file:///{index_file.resolve()}")
 
 def start():
     app = QApplication(sys.argv)# 

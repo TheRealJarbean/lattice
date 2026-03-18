@@ -29,7 +29,7 @@ import sys
 import keyring
 
 # Local imports
-import lattice.utils.config as config
+from lattice.utils.config import AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ class PreferencesWindow(QDialog):
         general_layout = QFormLayout(self.general_tab)
 
         # Pressure alert threshold
-        spinbox = ScientificDoubleSpinBox(value=config.PREFERENCES["pressure_warning_threshold"])
+        spinbox = ScientificDoubleSpinBox(value=AppConfig.PREFERENCES["pressure_warning_threshold"])
         spinbox.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         spinbox.setDecimals(6)
         spinbox.setRange(0, 10000000)
@@ -87,7 +87,7 @@ class PreferencesWindow(QDialog):
         
         # Display time as local time
         checkbox = QCheckBox()
-        checkbox.setChecked(config.PREFERENCES["display_time_as_local_time"])
+        checkbox.setChecked(AppConfig.PREFERENCES["display_time_as_local_time"])
         self.preferences_to_inputs_map["display_time_as_local_time"] = lambda: checkbox.isChecked()
         general_layout.addRow("Display Time as Local Time", checkbox)
 
@@ -117,7 +117,7 @@ class PreferencesWindow(QDialog):
         alerts_layout.addWidget(instructions)
 
         # Sender
-        sender = QLineEdit(config.ALERT_CONFIG['sender'])
+        sender = QLineEdit(AppConfig.ALERT['sender'])
         sender.setPlaceholderText("sender@cooldomain.com")
         self.alerts_to_inputs_map['sender'] = lambda: sender.text()
         sender.setValidator(QRegularExpressionValidator(r"[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+"))
@@ -143,7 +143,7 @@ class PreferencesWindow(QDialog):
 
         # Recipients
         alerts_layout.addWidget(QLabel("Recipients"))
-        recipients = QPlainTextEdit(',\n'.join(config.ALERT_CONFIG['recipients']))
+        recipients = QPlainTextEdit(',\n'.join(AppConfig.ALERT['recipients']))
         recipients.setPlaceholderText("someone@cooldomain.com,\nsomeone.else@cooldomain.com")
         self.alerts_to_inputs_map['recipients'] = lambda: [r for r in recipients.toPlainText().replace('\n', '').replace(' ', '').strip().split(',')]
         alerts_layout.addWidget(recipients)
@@ -165,18 +165,18 @@ class PreferencesWindow(QDialog):
     def apply_settings(self):
         for setting, getter in self.preferences_to_inputs_map.items():
             value = getter()
-            if config.PREFERENCES[setting] != value:
-                config.PREFERENCES[setting] = value
+            if AppConfig.PREFERENCES[setting] != value:
+                AppConfig.PREFERENCES[setting] = value
                 print(f"Setting {setting} to {getter()}")
 
         for setting, getter in self.alerts_to_inputs_map.items():
             value = getter()
-            if config.ALERT_CONFIG[setting] != value:
-                config.ALERT_CONFIG[setting] = value
+            if AppConfig.ALERT[setting] != value:
+                AppConfig.ALERT[setting] = value
                 print(f"Setting {setting} to {getter()}")
 
-        config.PREFERENCES.save()
-        config.ALERT_CONFIG.save()
+        AppConfig.PREFERENCES.save()
+        AppConfig.ALERT.save()
 
     def update_app_password(self):
         """
@@ -189,7 +189,7 @@ class PreferencesWindow(QDialog):
         # LINKS
         Manage App Passwords - https://myaccount.google.com/apppasswords
         """
-        sender = config.ALERT_CONFIG['sender']
+        sender = AppConfig.ALERT['sender']
         password = self.app_password_input.text()
         keyring.set_password('lattice', sender, password)
 

@@ -22,7 +22,8 @@ import time
 # Local imports
 from lattice.devices.source import Source
 from lattice.gui.widgets import InputModalWidget
-from lattice.utils import config, START_TIME, duration_to_str
+from lattice.utils import START_TIME, duration_to_str
+from lattice.utils.config import AppConfig
 from .source_control_widget import SourceControlWidget
 
 logger = logging.getLogger(__name__)
@@ -84,7 +85,7 @@ class SourceTab(QWidget):
         self.control_widgets: list[SourceControlWidget] = []
 
         # Load config colors
-        config_colors = config.THEME_CONFIG['source_tab']['colors']
+        config_colors = AppConfig.THEME['source_tab']['colors']
         # Safety in case config is missing color values or has too many
         config_colors = (config_colors + ["#FFFFFF"] * len(self.sources))[:len(self.sources)]
         self.colors = dict(zip(self.sources, config_colors))
@@ -310,17 +311,17 @@ class SourceTab(QWidget):
             
             # Save changes to config since safety settings are not stored on-device
             # Ensure source entry exists
-            logger.debug(config.PARAMETER_CONFIG)
-            if source.name not in config.PARAMETER_CONFIG['sources']['safety']:
-                config.PARAMETER_CONFIG['sources']['safety'][source.name] = {}
+            logger.debug(AppConfig.PARAMETER)
+            if source.name not in AppConfig.PARAMETER['sources']['safety']:
+                AppConfig.PARAMETER['sources']['safety'][source.name] = {}
                 
-            config = config.PARAMETER_CONFIG['sources']['safety'][source.name]
+            config = AppConfig.PARAMETER['sources']['safety'][source.name]
             config["from"] = safe_from
             config["to"] = safe_to
             config["rate_limit"] = safe_rate_limit
             config["max_setpoint"] = max_sp
             config["stability_tolerance"] = stability_tolerance
-            config.PARAMETER_CONFIG.save()
+            AppConfig.PARAMETER.save()
         
         # On cancellation
         else:
@@ -331,8 +332,8 @@ class SourceTab(QWidget):
         
         # Save color change to config file
         self.colors[source] = color
-        config.THEME_CONFIG['source_tab']['colors'] = list(self.colors.values())
-        config.THEME_CONFIG.save()
+        AppConfig.THEME['source_tab']['colors'] = list(self.colors.values())
+        AppConfig.THEME.save()
 
     def update_data_plot(self):
         # Update the plot with new full dataset

@@ -6,7 +6,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # Local imports
-from lattice.utils import config
+from lattice.utils.config import AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class EmailAlerter():
         self.smtp = None
         
         # This is set in the store_email_password.py script
-        password = keyring.get_password('lattice', config.ALERT_CONFIG['sender'])
+        password = keyring.get_password('lattice', AppConfig.ALERT['sender'])
         
         # Abort if password was not found
         if password is None:
@@ -34,7 +34,7 @@ class EmailAlerter():
         
         # Log in to smtp server
         try:
-            self.smtp.login(config.ALERT_CONFIG['sender'], password)
+            self.smtp.login(AppConfig.ALERT['sender'], password)
         except smtplib.SMTPAuthenticationError as e:
             logger.error(f"Alerter email authentication failed: {e}")
             self.smtp = None
@@ -63,7 +63,7 @@ class EmailAlerter():
         
         # Send message
         self.smtp.sendmail(
-            from_addr=config.ALERT_CONFIG['sender'], 
-            to_addrs=config.ALERT_CONFIG['recipients'], 
+            from_addr=AppConfig.ALERT['sender'], 
+            to_addrs=AppConfig.ALERT['recipients'], 
             msg=msg.as_string()
         )
