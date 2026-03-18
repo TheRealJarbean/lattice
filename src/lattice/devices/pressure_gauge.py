@@ -4,6 +4,10 @@ import serial
 import re
 import logging
 
+# Local imports
+from lattice.utils import config
+from lattice.definitions import ALERTER
+
 logger = logging.getLogger(__name__)
 
 class PressureGauge(QObject):
@@ -49,6 +53,18 @@ class PressureGauge(QObject):
         self._stop_polling.emit()
 
     def _pressure_changed(self, pressure: float):
+        threshold = config.PREFERENCES['pressure_warning_threshold']
+        if pressure > threshold:
+            ALERTER.send_email(
+                "ALERT! HIGH PRESSURE DETECTED!",
+                f"""
+                Lattice software has detected that gauge {self.name} has exceeded
+                the maximum pressure threshold of {threshold}. Latest gauge reading
+                was {pressure:.2e}.
+                """
+                )
+            # TODO: Try to mitigate pressure increase by doing something?
+
         self.pressure_changed.emit(pressure)
 
     def _rate_changed(self, rate: float):

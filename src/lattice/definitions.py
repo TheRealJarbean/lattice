@@ -1,6 +1,8 @@
 from pathlib import Path
+from lattice.utils.email_alerter import EmailAlerter
 
 ROOT_DIR = Path(__file__).parent
+ALERTER = EmailAlerter()
 
 SOURCE_MODBUS_ADDRESSES = {
     "2604_loop_1": {

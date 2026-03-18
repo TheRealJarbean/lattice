@@ -4,9 +4,6 @@ import yaml
 import platform
 from pathlib import Path
 
-# Local imports
-from lattice.definitions import ROOT_DIR
-
 logger = logging.getLogger(__name__)
 
 APP_NAME = 'lattice'

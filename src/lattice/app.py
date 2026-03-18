@@ -15,7 +15,7 @@ from pymodbus import pymodbus_apply_logging_config
 import lattice.utils.config as config
 from lattice.devices import Shutter, Source, PressureGauge
 from lattice.gui import *
-from lattice.utils import EmailAlert
+from lattice.utils import EmailAlerter
 
 # Set the log level based on env variable when program is run
 # Determines which logging statements are printed to console
@@ -58,9 +58,6 @@ class MainAppWindow(QMainWindow):
 
         # Set window title
         self.setWindowTitle("Lattice")
-        
-        # Configure email alerts
-        self.alert = EmailAlert(config.ALERT_CONFIG['recipients'])
         
         # Apply focus clearing filter
         QApplication.instance().installEventFilter(CLEAR_FOCUS_FILTER)
