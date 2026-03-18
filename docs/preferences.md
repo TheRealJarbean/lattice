@@ -30,7 +30,7 @@ Email alerts can be configured under the **Email Alerts** tab in the **Preferenc
 Email alerts will be sent under the following conditions:
 - Pressure of any pressure gauge exceeds **Pressure Email Warning Threshold** specified in Preferences.
 
-!!! note "Alert Frequency"
+!!! info "Alert Frequency"
     Alerts have an enforced interval of 15 minutes between alerts in order to prevent the sending email account from being flagged as spam.
 
 ## Theme
