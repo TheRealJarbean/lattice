@@ -29,6 +29,8 @@ where = ["src"]
 
 [dependency-groups]
 dev = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.5",
     "pip-licenses>=5.5.0",
     "pyinstaller>=6.17.0",
     "setuptools>=80.9.0",

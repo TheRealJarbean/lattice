@@ -1,0 +1,28 @@
+# TODO: (in the future)
+# MkDocs is unmaintained, with a growing number of issues. The soon-to-be-released MkDocs 2.0 (at time of writing)
+# introduces many breaking changes, is not community driven, and has no plugin system.
+# Currently (at time of writing) an alternative is being developed by the Material for MkDocs team called Zensical
+# which is a potential drop-in replacement once it becomes more feature-complete.
+
+site_name: Lattice Docs
+
+theme:
+  name: material
+  palette: 
+
+    # Palette toggle for light mode
+    - scheme: default
+      toggle:
+        icon: material/brightness-7 
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
