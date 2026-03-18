@@ -6,6 +6,13 @@
 
 site_name: Lattice Docs
 
+use_directory_urls: false
+
+nav:
+  - Getting Started: getting_started.md
+  - Installation: installation.md
+  - Preferences: preferences.md
+
 theme:
   name: material
   palette: 
