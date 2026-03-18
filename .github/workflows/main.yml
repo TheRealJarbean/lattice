@@ -51,7 +51,10 @@ jobs:
       - name: Build executable with pyinstaller
         run: |
           uv add pyinstaller
-          uv run -- pyinstaller --onefile --name "${{ steps.naming.outputs.bin_name }}" ./src/lattice/launcher.py
+          uv add mkdocs
+          uv add mkdocs-material
+          uv run -- mkdocs build
+          uv run -- pyinstaller --onefile --name "${{ steps.naming.outputs.bin_name }}" ./src/lattice/launcher.py --add-data "site:site"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
