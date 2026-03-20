@@ -65,8 +65,6 @@ class Source(QObject):
         self.rate_limit = 0.0
         self.setpoint = 0.0
         self.working_setpoint = 0.0
-        self.is_pv_close_to_sp = False
-        self.is_stable = False
 
         # Last read PID values
         self.pid_pb = 0.0
@@ -364,14 +362,13 @@ class SourceWorker(QObject):
                 # skip if current rate limit was not read
                 if new_rate_limit is not None:
                     safe_rate, safe_from, safe_to = self.safe_rate_limit, self.safe_rate_limit_from, self.safe_rate_limit_to
-                    if (safe_rate > 0 and safe_from > 0 and safe_to > 0
-                        and safe_from < new_working_setpoint < safe_to):
+                    if (safe_rate > 0 and safe_from < new_working_setpoint < safe_to):
                         target = safe_rate
                     else:
                         target = self.desired_rate_limit
                     
                     if new_rate_limit != target:
-                        self.write_rate_limit(target)
+                        self._write_rate_limit(target)
 
         # Ensure polling guard gets reset no matter what
         finally:
@@ -393,7 +390,7 @@ class SourceWorker(QObject):
         self._write_data_by_key("setpoint_rate_limit", rate_limit)
     
     @Slot()
-    def read_pid(self) -> tuple[float, float, float] | None:
+    def read_pid(self):
         """
         Returns pid_pb, pid_ti, and pid_td as tuple
         """
@@ -469,9 +466,10 @@ class SourceWorker(QObject):
     def _check_stability(self):
         if not self.is_pv_close_to_sp:
             self.stability_time = time.monotonic()
-            self.is_stable = False
-            self.is_stable_changed.emit(False)
-            return
+            if self.is_stable:
+                self.is_stable = False
+                self.is_stable_changed.emit(False)
+                return
         
         if self.is_stable:
             return
