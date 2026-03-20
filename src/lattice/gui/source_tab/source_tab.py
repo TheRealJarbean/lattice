@@ -52,8 +52,8 @@ class SourceTab(QWidget):
 
         # Connect source process variable and working setpoint changes to data handling
         for source in self.sources:
-            source.process_variable_changed.connect(self.on_new_process_variable)
-            source.working_setpoint_changed.connect(self.on_new_working_setpoint)
+            source.process_variable_changed.connect(lambda pv, s=source: self.on_new_process_variable(pv, s))
+            source.working_setpoint_changed.connect(lambda wsp, s=source: self.on_new_working_setpoint(wsp, s))
             
         #########################
         # CONTROL WIDGET CONFIG #

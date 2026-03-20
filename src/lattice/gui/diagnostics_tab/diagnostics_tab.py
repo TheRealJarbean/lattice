@@ -58,7 +58,9 @@ class DiagnosticsTab(QWidget):
             lambda name, address, value: self.source_dict[name].write_data_by_address(address, value)
             )
         for source in self.sources:
-            source.new_modbus_data.connect(self.source_serial_log.append_data)
+            source.new_modbus_data.connect(
+                lambda data, name=source.name: self.source_serial_log.append_data(name, data)
+            )
         
         self.shutter_serial_log.send_command.connect(
             lambda name, cmd: self.shutter_dict[name].send_command(cmd)
