@@ -1,5 +1,4 @@
 from PySide6.QtCore import QMutex, QObject, Signal, QThread, Slot
-import time
 import logging
 import serial
 
@@ -10,6 +9,8 @@ class Shutter(QObject):
     _open = Signal()
     _close = Signal()
     _send_command = Signal(str) # Command
+    _enable = Signal()
+    _disable = Signal()
     
     # External signals
     is_open_changed = Signal(bool) # State
@@ -24,6 +25,8 @@ class Shutter(QObject):
 
         self._open.connect(self.worker.open)
         self._close.connect(self.worker.close)
+        self._enable.connect(self.worker.enable)
+        self._disable.connect(self.worker.disable)
         self._send_command.connect(self.worker.send_custom_command)
         self.worker.is_open_changed.connect(self._is_open_changed)
         self.worker.new_serial_data.connect(self._new_serial_data)
@@ -35,6 +38,12 @@ class Shutter(QObject):
 
     def close(self):
         self._close.emit()
+
+    def enable(self):
+        self._enable.emit()
+
+    def disable(self):
+        self._disable.emit()
 
     def send_command(self, command: str):
         self._send_command.emit(command)
@@ -57,7 +66,8 @@ class ShutterWorker(QObject):
         self.serial_mutex = serial_mutex
         self.enabled = True
         self.data_mutex = QMutex()
-        
+
+    @Slot(str) 
     def send_command(self, cmd):
         """Send a message to the serial port."""
         self.serial_mutex.lock()
@@ -83,12 +93,14 @@ class ShutterWorker(QObject):
                 self.data_mutex.unlock()
                 
         self.serial_mutex.unlock()
-        
+
+    @Slot() 
     def enable(self):
         self.data_mutex.lock()
         self.enabled = True
         self.data_mutex.unlock()
             
+    @Slot()
     def disable(self):
         self.data_mutex.lock()
         self.enabled = False

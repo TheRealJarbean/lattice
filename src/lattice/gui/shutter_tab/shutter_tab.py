@@ -22,7 +22,7 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         #########
 
         for i, shutter in enumerate(self.shutters):
-            shutter.is_open_changed.connect(lambda is_open, s=shutter: self.on_state_change(s, is_open))
+            shutter.is_open_changed.connect(lambda is_open, idx=i: self.on_state_change(is_open, idx))
         
         self.current_step = 0
         self.loop_step_timer = QTimer()
@@ -241,16 +241,12 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         button.style().polish(button)
         button.update()
         
-    def on_state_change(self, shutter: Shutter, is_open):
-        for idx, s in enumerate(self.shutters):
-            if s is not shutter:
-                continue
-            
-            button = self.control_widgets[idx].output_button
-            button.setText("Open" if is_open else "Closed")
-            button.setProperty('is_open', is_open)
-        
-            # Refresh button style
-            button.style().unpolish(button)
-            button.style().polish(button)
-            button.update()
+    def on_state_change(self, is_open, idx):   
+        button = self.control_widgets[idx].output_button
+        button.setText("Open" if is_open else "Closed")
+        button.setProperty('is_open', is_open)
+    
+        # Refresh button style
+        button.style().unpolish(button)
+        button.style().polish(button)
+        button.update()
