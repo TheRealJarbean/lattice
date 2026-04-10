@@ -259,7 +259,8 @@ class MainAppWindow(QMainWindow):
         else:
             # running normally, assume site is on same level as src
             site_path = definitions.ROOT_DIR / ".." / ".." / "site"
-
+        
+        print(site_path)
         index_file = site_path / "index.html"
         if not index_file.exists():
             logger.error("Couldn't find local docs!")

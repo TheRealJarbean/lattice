@@ -41,6 +41,7 @@ class PressureGauge(QObject):
         self.worker.moveToThread(worker_thread)
 
     def toggle_on_off(self):
+        print(self.name)
         self._toggle_on_off.emit()
 
     def send_command(self, command: str):
@@ -67,20 +68,23 @@ class PressureGauge(QObject):
 
         self.pressure_changed.emit(pressure)
 
+    @Slot(float)
     def _rate_changed(self, rate: float):
         self.rate_changed.emit(rate)
 
+    @Slot(bool)
     def _is_on_changed(self, is_on: bool):
         self.is_on_changed.emit(is_on)
 
+    @Slot(str)
     def _new_serial_data(self, message: str):
         self.new_serial_data.emit(message)
 
 class PressureGaugeWorker(QObject):
-    pressure_changed = Signal(float, QObject) # Value, self ref
-    rate_changed = Signal(float, QObject) # Value, self ref
-    is_on_changed = Signal(bool, QObject) # State, self ref
-    new_serial_data = Signal(str, str) # Name, data
+    pressure_changed = Signal(float) # Value
+    rate_changed = Signal(float) # Value,
+    is_on_changed = Signal(bool) # State
+    new_serial_data = Signal(str) # data
 
     def __init__(self, name, address, ser: serial.Serial, serial_mutex: QMutex):
         super().__init__()
@@ -110,7 +114,7 @@ class PressureGaugeWorker(QObject):
                 time.sleep(0.01)
                 
                 self.data_mutex.lock()
-                self.new_serial_data.emit(self.name, f"O: {cmd}")
+                self.new_serial_data.emit(f"O: {cmd}")
                 self.data_mutex.unlock()
                 
                 response = self.ser.readline()
@@ -145,9 +149,9 @@ class PressureGaugeWorker(QObject):
             self.is_on = False
             self.data_mutex.unlock()
 
-            self.is_on_changed.emit(False, self)
+            self.is_on_changed.emit(False)
             self.rate_per_second = None
-            self.rate_changed.emit(0, self)
+            self.rate_changed.emit(0)
             return
         
         self.data_mutex.lock()
@@ -155,7 +159,7 @@ class PressureGaugeWorker(QObject):
         self.data_mutex.unlock()
         
         logger.debug(f"Turning on gauge {name}")
-        self.is_on_changed.emit(True, self)
+        self.is_on_changed.emit(True)
         self.send_command(f'#0031{address}')
     
     @Slot()
@@ -199,7 +203,7 @@ class PressureGaugeWorker(QObject):
             return
         
         self.data_mutex.lock()
-        self.new_serial_data.emit(self.name, f"I: {res}")
+        self.new_serial_data.emit(f"I: {res}")
         self.data_mutex.unlock()
         
         res = res[1:] # trim leading >
@@ -213,16 +217,16 @@ class PressureGaugeWorker(QObject):
                     self.data_mutex.lock()
                     if self.is_on:
                         self.is_on = False
-                        self.is_on_changed.emit(self.is_on, self)
+                        self.is_on_changed.emit(self.is_on)
                     self.data_mutex.unlock()
                     return
                 
-                self.pressure_changed.emit(value, self)
+                self.pressure_changed.emit(value)
                 
                 self.data_mutex.lock()
                 if not self.is_on:
                     self.is_on = True
-                    self.is_on_changed.emit(self.is_on, self)
+                    self.is_on_changed.emit(self.is_on)
                 self.data_mutex.unlock()
                 
                 # Update rate per second
@@ -231,7 +235,7 @@ class PressureGaugeWorker(QObject):
                 else:
                     self.rate_per_second = value
                 
-                self.rate_changed.emit(self.rate_per_second, self)
+                self.rate_changed.emit(self.rate_per_second)
                 self.update_rate = False
 
             except Exception as e:

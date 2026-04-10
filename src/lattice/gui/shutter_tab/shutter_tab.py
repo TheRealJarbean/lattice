@@ -230,12 +230,12 @@ class ShutterTab(QWidget, Ui_ShutterTab):
         button: QPushButton = self.sender()
         is_open: bool = button.property("is_open")
         idx: int = button.property("idx")
-            
+
         if is_open:
             self.shutters[idx].close()
         else:
             self.shutters[idx].open()
-            
+
         # Refresh button style
         button.style().unpolish(button)
         button.style().polish(button)

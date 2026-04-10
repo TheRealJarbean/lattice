@@ -48,15 +48,17 @@ class Shutter(QObject):
     def send_command(self, command: str):
         self._send_command.emit(command)
 
+    @Slot(bool)
     def _is_open_changed(self, is_open: bool):
         self.is_open_changed.emit(is_open)
 
+    @Slot(str)
     def _new_serial_data(self, data):
         self.new_serial_data.emit(data)
 
 class ShutterWorker(QObject):
-    is_open_changed = Signal(object, bool) # Reference to self, is_open
-    new_serial_data = Signal(str, str) # Name, data
+    is_open_changed = Signal(bool) # is_open
+    new_serial_data = Signal(str) # data
     
     def __init__(self, name: str, address: int, ser: serial.Serial, serial_mutex: QMutex):
         super().__init__()
@@ -77,14 +79,14 @@ class ShutterWorker(QObject):
                 self.ser.write(f"{cmd}\r\n".encode('utf-8'))
                 
                 self.data_mutex.lock()
-                self.new_serial_data.emit(self.name, f"O: {cmd}")
+                self.new_serial_data.emit(f"O: {cmd}")
                 self.data_mutex.unlock()
                 
                 res = self.ser.readline()
                 if res:
                     message = res.decode('utf-8', errors='ignore').strip()
                     self.data_mutex.lock()
-                    self.new_serial_data.emit(self.name, f"I: {message}")
+                    self.new_serial_data.emit(f"I: {message}")
                     self.data_mutex.unlock()
                     
             except Exception as e:
@@ -117,7 +119,7 @@ class ShutterWorker(QObject):
         
         self.send_command(f'/{address}TR')
         self.send_command(f'/{address}e0R')
-        self.is_open_changed.emit(self, False)
+        self.is_open_changed.emit(False)
 
     @Slot()
     def open(self):
@@ -133,7 +135,7 @@ class ShutterWorker(QObject):
         logger.debug(f"Opening shutter {address} ({name})")
         self.send_command(f'/{address}TR')
         self.send_command(f'/{address}e7R')
-        self.is_open_changed.emit(self, True)
+        self.is_open_changed.emit(True)
 
     @Slot()
     def close(self):
@@ -149,7 +151,7 @@ class ShutterWorker(QObject):
         logger.debug(f"Closing shutter {address} ({name})")
         self.send_command(f'/{address}TR')
         self.send_command(f'/{address}e8R')
-        self.is_open_changed.emit(self, False)
+        self.is_open_changed.emit(False)
         
     @Slot()
     def send_custom_command(self, command):
