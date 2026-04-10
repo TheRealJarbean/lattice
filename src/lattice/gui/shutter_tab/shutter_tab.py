@@ -98,6 +98,10 @@ class ShutterTab(QWidget, Ui_ShutterTab):
                 background-color: rgb(0, 255, 0);
                 """)
             
+            # Clear open_close_buffer
+            for shutter in self.shutters:
+                shutter.clear_open_close_buffer()
+            
             # Close all shutters
             for shutter in self.shutters:
                 shutter.close()

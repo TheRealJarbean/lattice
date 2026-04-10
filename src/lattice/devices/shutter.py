@@ -1,4 +1,4 @@
-from PySide6.QtCore import QMutex, QObject, Signal, QThread, Slot
+from PySide6.QtCore import QMutex, QObject, Signal, QThread, Slot, QTimer
 import logging
 import serial
 
@@ -11,10 +11,12 @@ class Shutter(QObject):
     _send_command = Signal(str) # Command
     _enable = Signal()
     _disable = Signal()
+    _clear_open_closed_buffer = Signal()
     
     # External signals
     is_open_changed = Signal(bool) # State
     new_serial_data = Signal(str) # Data
+   
 
     def __init__(self, name: str, address: int, ser: serial.Serial, serial_mutex: QMutex, worker_thread: QThread):
         super().__init__()
@@ -28,6 +30,7 @@ class Shutter(QObject):
         self._enable.connect(self.worker.enable)
         self._disable.connect(self.worker.disable)
         self._send_command.connect(self.worker.send_custom_command)
+        self._clear_open_closed_buffer.connect(self.worker.clear_open_close_buffer)
         self.worker.is_open_changed.connect(self._is_open_changed)
         self.worker.new_serial_data.connect(self._new_serial_data)
 
@@ -38,6 +41,9 @@ class Shutter(QObject):
 
     def close(self):
         self._close.emit()
+
+    def clear_open_close_buffer(self):
+        self._clear_open_closed_buffer.emit()
 
     def enable(self):
         self._enable.emit()
@@ -59,6 +65,7 @@ class Shutter(QObject):
 class ShutterWorker(QObject):
     is_open_changed = Signal(bool) # is_open
     new_serial_data = Signal(str) # data
+    in_motion_changed = Signal(bool) # State
     
     def __init__(self, name: str, address: int, ser: serial.Serial, serial_mutex: QMutex):
         super().__init__()
@@ -68,6 +75,11 @@ class ShutterWorker(QObject):
         self.serial_mutex = serial_mutex
         self.enabled = True
         self.data_mutex = QMutex()
+
+        self.open_close_buffer = []
+        self.open_close_timer = QTimer(self)
+        self.open_close_timer.timeout.connect(self._execute_open_close)
+        self.open_close_timer.start(50)
 
     @Slot(str) 
     def send_command(self, cmd):
@@ -117,41 +129,52 @@ class ShutterWorker(QObject):
         if not enabled:
             return
         
+        self.in_motion_changed.emit(True)
         self.send_command(f'/{address}TR')
         self.send_command(f'/{address}e0R')
+        self.in_motion_changed.emit(False)
         self.is_open_changed.emit(False)
 
     @Slot()
     def open(self):
         self.data_mutex.lock()
-        enabled = self.enabled
-        address = self.address
-        name = self.name
+        self.open_close_buffer.append(True)
         self.data_mutex.unlock()
-        
-        if not enabled:
-            return
-            
-        logger.debug(f"Opening shutter {address} ({name})")
-        self.send_command(f'/{address}TR')
-        self.send_command(f'/{address}e7R')
-        self.is_open_changed.emit(True)
 
     @Slot()
     def close(self):
+        self.data_mutex.lock()
+        self.open_close_buffer.append(False)
+        self.data_mutex.unlock()
+
+    def _execute_open_close(self):
         self.data_mutex.lock()
         enabled = self.enabled
         address = self.address
         name = self.name
         self.data_mutex.unlock()
-        
+
         if not enabled:
             return
+        
+        if self.open_close_buffer:
+            open = self.open_close_buffer.pop(0)
+
+            if open:
+                logger.debug(f"Opening shutter {address} ({name})")
+                self.send_command(f'/{address}TR')
+                self.send_command(f'/{address}e7R')
+                self.is_open_changed.emit(True)
+                return
             
-        logger.debug(f"Closing shutter {address} ({name})")
-        self.send_command(f'/{address}TR')
-        self.send_command(f'/{address}e8R')
-        self.is_open_changed.emit(False)
+            logger.debug(f"Closing shutter {address} ({name})")
+            self.send_command(f'/{address}TR')
+            self.send_command(f'/{address}e8R')
+            self.is_open_changed.emit(False)
+
+    @Slot()
+    def clear_open_close_buffer(self):
+        self.open_close_buffer = []
         
     @Slot()
     def send_custom_command(self, command):
