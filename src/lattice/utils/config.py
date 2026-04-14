@@ -49,6 +49,9 @@ class Config:
     def __setitem__(self, key, value):
         self.data[key] = value
 
+    def __str__(self):
+        return self.data.__str__()
+
     def get_config_dir(self):
         system = platform.system()
 
