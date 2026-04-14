@@ -77,7 +77,7 @@ class PressureTab(QWidget):
             gauge.is_on_changed.connect(controls.update_on_off_text)
             
             # Connect power toggle button action
-            controls.power_toggle_button.clicked.connect(lambda g=gauge: g.toggle_on_off)
+            controls.power_toggle_button.clicked.connect(gauge.toggle_on_off)
         
         # Create pressure data plot
         self.pressure_plot = StackedScrollingPlotWidget(

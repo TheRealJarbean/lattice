@@ -78,10 +78,11 @@ class PreferencesWindow(QDialog):
         general_layout = QFormLayout(self.general_tab)
 
         # Pressure alert threshold
-        spinbox = ScientificDoubleSpinBox(value=AppConfig.PREFERENCES["pressure_warning_threshold"])
+        spinbox = ScientificDoubleSpinBox()
         spinbox.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         spinbox.setDecimals(6)
         spinbox.setRange(0, 10000000)
+        spinbox.setValue(AppConfig.PREFERENCES["pressure_warning_threshold"])
         self.preferences_to_inputs_map["pressure_warning_threshold"] = lambda: spinbox.value()
         general_layout.addRow("Pressure Email Warning Threshold", spinbox)
         
