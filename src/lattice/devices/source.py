@@ -36,6 +36,7 @@ class Source(QObject):
     new_modbus_data = Signal(str) # Message
     is_pv_close_to_sp_changed = Signal(bool)
     is_stable_changed = Signal(bool)
+    safety_settings_changed = safety_settings_changed = Signal(float, float, float, float, float) # rate limit, from, to, max setpoint, stability tolerance
 
     def __init__(self, 
                  name, 
@@ -60,6 +61,25 @@ class Source(QObject):
 
         self.name = name
 
+        if safety_settings:
+            logger.debug(f"""
+                Found safety settings for source {name}:
+                - rate_limit: {safety_settings['rate_limit']}
+                - from: {safety_settings['from']}
+                - to: {safety_settings['to']}
+                """)
+            self.safe_rate_limit = safety_settings['rate_limit']
+            self.safe_rate_limit_from = safety_settings['from']
+            self.safe_rate_limit_to = safety_settings['to']
+            self.max_setpoint = safety_settings['max_setpoint']
+            self.stability_tolerance = safety_settings['stability_tolerance']
+        else:
+            self.safe_rate_limit = 0.0
+            self.safe_rate_limit_from = 0.0
+            self.safe_rate_limit_to = 0.0
+            self.max_setpoint = 2000.0
+            self.stability_tolerance = 1.0
+
         # Live data monitoring attributes
         self.process_variable = 0.0
         self.rate_limit = 0.0
@@ -79,7 +99,7 @@ class Source(QObject):
         self.worker.is_pv_close_to_sp_changed.connect(self._update_is_pv_close_to_sp)
         self.worker.is_stable_changed.connect(self._update_is_stable)
         self.worker.pid_changed.connect(self._update_pid)
-        self.worker.new_modbus_data.connect(self.on_new_modbus_data)
+        self.worker.new_modbus_data.connect(self._on_new_modbus_data)
 
         # Connect internal signals
         self._read_data_by_address.connect(self.worker.read_data_by_address)
@@ -143,8 +163,17 @@ class Source(QObject):
         self.is_stable_changed.emit(self.is_stable)
 
     @Slot(str)
-    def on_new_modbus_data(self, message: str):
+    def _on_new_modbus_data(self, message: str):
         self.new_modbus_data.emit(message)
+
+    @Slot(float, float, float, float, float)
+    def _safety_settings_changed(self, safety_from, safety_to, rate_limit, max_setpoint, tolerance):
+        self.safe_rate_limit_from = safety_from
+        self.safe_rate_limit_to = safety_to
+        self.safe_rate_limit = rate_limit
+        self.max_setpoint = max_setpoint
+        self.stability_tolerance = tolerance
+        self.safety_settings_changed.emit(safety_from, safety_to, rate_limit, max_setpoint, tolerance)
     # MONITORING SLOTS END #
 
     # READ AND WRITE DATA #
@@ -185,6 +214,15 @@ class Source(QObject):
     
     def get_is_pv_close_to_sp(self):
         return self.is_pv_close_to_sp
+    
+    def get_rate_limit_safety(self):
+        return self.safe_rate_limit, self.safe_rate_limit_from, self.safe_rate_limit_to
+    
+    def get_max_setpoint(self):
+        return self.max_setpoint
+    
+    def get_stability_tolerance(self):
+        return self.stability_tolerance
     
     def set_setpoint(self, setpoint: float):
         self._write_setpoint.emit(setpoint)
