@@ -164,3 +164,68 @@ class ShutterWorker(QObject):
         
         logger.debug(f"Sending custom shutter command to {address} ({name}): {command}")
         self.send_command(f'/{address}{command}')
+
+
+class VirtualShutterWorker(ShutterWorker):
+    """
+    Mimicks real shutter functionality for testing, sends no commands
+    """
+
+    def __init__(self, name: str, address: int):
+        super().__init__()
+        self.name = name
+        self.address = address
+        self.enabled = True
+        self.data_mutex = QMutex()
+
+    @Slot(str) 
+    def send_command(self, cmd):
+        pass
+
+    @Slot() 
+    def enable(self):
+        self.data_mutex.lock()
+        self.enabled = True
+        self.data_mutex.unlock()
+            
+    @Slot()
+    def disable(self):
+        self.data_mutex.lock()
+        self.enabled = False
+        self.data_mutex.unlock()
+
+    def reset(self):
+        self.data_mutex.lock()
+        enabled = self.enabled
+        self.data_mutex.unlock()
+        
+        if not enabled:
+            return
+        
+        self.is_open_changed.emit(self, False)
+
+    @Slot()
+    def open(self):
+        self.data_mutex.lock()
+        enabled = self.enabled
+        self.data_mutex.unlock()
+        
+        if not enabled:
+            return
+        
+        self.is_open_changed.emit(self, True)
+
+    @Slot()
+    def close(self):
+        self.data_mutex.lock()
+        enabled = self.enabled
+        self.data_mutex.unlock()
+        
+        if not enabled:
+            return
+        
+        self.is_open_changed.emit(self, False)
+        
+    @Slot()
+    def send_custom_command(self, command):
+        pass
