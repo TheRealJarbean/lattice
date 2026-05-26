@@ -13,7 +13,7 @@ from PySide6.QtCore import QThread, QTimer, Qt, Signal
 from PySide6.QtGui import QFont
 from collections import deque
 from functools import partial
-from datetime import timedelta
+from datetime import timedelta, datetime
 import pyqtgraph as pg
 import numpy as np
 import logging
@@ -22,7 +22,8 @@ import time
 # Local imports
 from lattice.devices.source import Source
 from lattice.gui.widgets import InputModalWidget
-from lattice.utils import config, START_TIME
+from lattice.utils import START_TIME, duration_to_str
+from lattice.utils.config import AppConfig
 from .source_control_widget import SourceControlWidget
 
 logger = logging.getLogger(__name__)
@@ -30,15 +31,9 @@ logger = logging.getLogger(__name__)
 # Custom axis for time in plots
 class TimeAxis(pg.AxisItem):
     def tickStrings(self, values, scale, spacing):
-        return [str(timedelta(seconds=v)) for v in values]
+        return [duration_to_str(v) for v in values]
 
 class SourceTab(QWidget):
-    start_polling = Signal(Source, int) # Source, interval_ms
-    stop_polling = Signal(Source) # Source
-    set_setpoint = Signal(Source, float) # Source, setpoint
-    set_rate_limit = Signal(Source, float) # Source, rate_limit
-    set_safety = Signal(Source, float, float, float) # Source, rate_limit, from, to
-
     def __init__(self, sources: list[Source]):
         super().__init__()
         
@@ -57,16 +52,8 @@ class SourceTab(QWidget):
 
         # Connect source process variable and working setpoint changes to data handling
         for source in self.sources:
-            source.process_variable_changed.connect(self.on_new_process_variable)
-            source.working_setpoint_changed.connect(self.on_new_working_setpoint)
-
-        # Connect own signals
-        for source in self.sources:
-            self.start_polling.connect(source.start_polling)
-            self.stop_polling.connect(source.stop_polling)
-            self.set_setpoint.connect(source.set_setpoint)
-            self.set_rate_limit.connect(source.set_rate_limit)
-            self.set_safety.connect(source.set_rate_limit_safety)
+            source.process_variable_changed.connect(lambda pv, s=source: self.on_new_process_variable(pv, s))
+            source.working_setpoint_changed.connect(lambda wsp, s=source: self.on_new_working_setpoint(wsp, s))
             
         #########################
         # CONTROL WIDGET CONFIG #
@@ -98,7 +85,7 @@ class SourceTab(QWidget):
         self.control_widgets: list[SourceControlWidget] = []
 
         # Load config colors
-        config_colors = config.THEME_CONFIG['source_tab']['colors']
+        config_colors = AppConfig.THEME['source_tab']['colors']
         # Safety in case config is missing color values or has too many
         config_colors = (config_colors + ["#FFFFFF"] * len(self.sources))[:len(self.sources)]
         self.colors = dict(zip(self.sources, config_colors))
@@ -172,6 +159,7 @@ class SourceTab(QWidget):
         # Add cursor tracking line
         self.cursor_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('y', width=1))
         self.cursor_label = pg.TextItem(color="y")
+        self.cursor_label.setFont(QFont("SegoeUI", 18))
 
         self.data_plot.plotItem.addItem(self.cursor_line, ignoreBounds=True)
         self.data_plot.plotItem.addItem(self.cursor_label, ignoreBounds=True)
@@ -261,7 +249,7 @@ class SourceTab(QWidget):
     
     def open_pid_input_modal(self, source: Source):
         pid_input_settings = ["PB", "TI", "TD"] # TODO: Ask what these should be
-        current_values = source.get_pid()
+        current_values = source.read_pid()
         input_modal = InputModalWidget(
             pid_input_settings, 
             defaults=current_values, 
@@ -277,7 +265,7 @@ class SourceTab(QWidget):
             pid_td = values["TD"]
             
             # Apply changes to source
-            source.set_pid(
+            source.write_pid(
                 pid_pb=pid_pb,
                 pid_ti=pid_ti,
                 pid_td=pid_td
@@ -316,20 +304,24 @@ class SourceTab(QWidget):
                 )
             source.set_max_setpoint(max_sp)
             source.set_stability_tolerance(stability_tolerance)
+
+            # Apply max setpoint limit to setpoint input
+            for controls in self.control_widgets:
+                controls.input_setpoint.setMaximum(max_sp)
             
             # Save changes to config since safety settings are not stored on-device
             # Ensure source entry exists
-            logger.debug(config.PARAMETER_CONFIG)
-            if source.name not in config.PARAMETER_CONFIG['sources']['safety']:
-                config.PARAMETER_CONFIG['sources']['safety'][source.name] = {}
+            logger.debug(AppConfig.PARAMETER)
+            if source.name not in AppConfig.PARAMETER['sources']['safety']:
+                AppConfig.PARAMETER['sources']['safety'][source.name] = {}
                 
-            config = config.PARAMETER_CONFIG['sources']['safety'][source.name]
+            config = AppConfig.PARAMETER['sources']['safety'][source.name]
             config["from"] = safe_from
             config["to"] = safe_to
             config["rate_limit"] = safe_rate_limit
             config["max_setpoint"] = max_sp
             config["stability_tolerance"] = stability_tolerance
-            config.PARAMETER_CONFIG.save()
+            AppConfig.PARAMETER.save()
         
         # On cancellation
         else:
@@ -340,8 +332,8 @@ class SourceTab(QWidget):
         
         # Save color change to config file
         self.colors[source] = color
-        config.THEME_CONFIG['source_tab']['colors'] = list(self.colors.values())
-        config.THEME_CONFIG.save()
+        AppConfig.THEME['source_tab']['colors'] = list(self.colors.values())
+        AppConfig.THEME.save()
 
     def update_data_plot(self):
         # Update the plot with new full dataset
@@ -409,10 +401,16 @@ class SourceTab(QWidget):
         self.cursor_line.show()
 
         # Label at top of plot
-        time_str = str(timedelta(seconds=x))
-        time_str = time_str[:time_str.index('.') + 3] # Truncate to two decimals
-        (_, _), (ymin, ymax) = target_vb.viewRange()
+        time_str = duration_to_str(x)
+
+        (xmin, xmax), (_, ymax) = target_vb.viewRange()
         self.cursor_label.setText(f"t = {time_str}")
+
+        if x > xmax - ((xmax - xmin) * 0.014 * len(time_str)): # rough estimate of right border
+            self.cursor_label.setAnchor((1, 0)) # right-align
+        else:
+            self.cursor_label.setAnchor((0, 0)) # left-align
+        
         self.cursor_label.setPos(x, ymax)
         self.cursor_label.show()
 

@@ -24,7 +24,7 @@ class WaitUntilSetpointStableAction(WaitUntilSetpointAction):
         
         for source_name in self.sources_checking:
             source = self.sources[source_name]
-            if source.get_is_stable() and source.is_pv_close_to_sp():
+            if source.get_is_stable() and source.get_is_pv_close_to_sp():
                 self.sources_finished.add(source_name)
             else:
                 self.sources_finished.discard(source_name)

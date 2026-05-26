@@ -4,6 +4,7 @@ from .recipe_tab import RecipeTab
 from .shutter_tab import ShutterTab
 from .source_tab import SourceTab
 from .widgets import InputModalWidget, PopoutTabWindow, StackedScrollingPlotWidget
+from .preferences_window import PreferencesWindow
 
 __all__ = [
     "DiagnosticsTab",
@@ -14,4 +15,5 @@ __all__ = [
     "InputModalWidget",
     "PopoutTabWindow",
     "StackedScrollingPlotWidget",
+    "PreferencesWindow"
 ]

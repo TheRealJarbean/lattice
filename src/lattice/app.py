@@ -6,16 +6,19 @@ from PySide6.QtCore import Qt, QMutex, QEvent, QObject, QThread
 from PySide6.QtGui import QAction
 import logging
 import os
+import sys
 import serial
+import webbrowser
+import shutil
 from pathlib import Path
 from pymodbus.client import ModbusSerialClient as ModbusClient
 from pymodbus import pymodbus_apply_logging_config
 
 # Local imports
-import lattice.utils.config as config
+from lattice.utils.config import AppConfig
+from lattice import definitions
 from lattice.devices import Shutter, Source, PressureGauge
 from lattice.gui import *
-from lattice.utils import EmailAlert
 
 # Set the log level based on env variable when program is run
 # Determines which logging statements are printed to console
@@ -55,21 +58,46 @@ class MainAppWindow(QMainWindow):
         
         # Change default window size
         self.resize(1400, 900)
-        
-        # Configure email alerts
-        self.alert = EmailAlert(config.ALERT_CONFIG['recipients'])
+
+        # Set window title
+        self.setWindowTitle("Lattice")
         
         # Apply focus clearing filter
         QApplication.instance().installEventFilter(CLEAR_FOCUS_FILTER)
+
+        ##################
+        # MENU BAR SETUP #
+        ##################
+
+        menubar = self.menuBar()
+        menubar.setStyleSheet("""
+        QMenuBar::item {
+            padding: 6px 14px;
+        }
+                              
+        QMenuBar::item:selected {
+            background: #555;
+        }       
+        """)
+
+        self.prefs = PreferencesWindow(self)
+        preferences_action = QAction("Preferences", self)
+        preferences_action.triggered.connect(self.prefs.exec)
+        menubar.addAction(preferences_action)
+
+        docs_action = QAction("Docs", self)
+        docs_action.triggered.connect(self.open_docs)
+        menubar.addAction(docs_action)
         
         ##################
         # PRESSURE SETUP #
         ##################
         
         self.pressure_gauges: list[PressureGauge] = []
+        self.pressure_thread = QThread()
 
         # Populate pressure gauge list from config file
-        for pressure_config in config.HARDWARE_CONFIG['devices']['pressure'].values():
+        for pressure_config in AppConfig.HARDWARE['devices']['pressure'].values():
             ser = serial.Serial(
                 port=pressure_config['serial']['port'], 
                 baudrate=pressure_config['serial']['baudrate'],
@@ -83,13 +111,9 @@ class MainAppWindow(QMainWindow):
                     name=gauge['name'], 
                     address=gauge['address'],
                     ser=ser,
-                    serial_mutex=mutex
+                    serial_mutex=mutex,
+                    worker_thread=self.pressure_thread,
                     ))
-        
-        # Move pressure gauges to dedicated thread
-        self.pressure_thread = QThread()
-        for gauge in self.pressure_gauges:
-            gauge.moveToThread(self.pressure_thread)
 
         # Start the pressure thread event loop
         self.pressure_thread.start()
@@ -99,11 +123,12 @@ class MainAppWindow(QMainWindow):
         ################
         
         self.sources: list[Source] = []
+        self.source_thread = QThread()
         
-        if config.PARAMETER_CONFIG['sources']['safety'] is None:
-            config.PARAMETER_CONFIG['sources']['safety'] = {}
-        safety_settings = config.PARAMETER_CONFIG['sources']['safety']
-        for source_config in config.HARDWARE_CONFIG['devices']['sources'].values():
+        if AppConfig.PARAMETER['sources']['safety'] is None:
+            AppConfig.PARAMETER['sources']['safety'] = {}
+        safety_settings = AppConfig.PARAMETER['sources']['safety']
+        for source_config in AppConfig.HARDWARE['devices']['sources'].values():
             logger.debug(source_config)
             logger.debug(source_config['serial']['port'])
             client = ModbusClient(
@@ -120,13 +145,9 @@ class MainAppWindow(QMainWindow):
                     address_set=device['address_set'],
                     safety_settings=safety_settings.get(device['name'], {}),
                     client=client,
-                    serial_mutex=mutex
+                    serial_mutex=mutex,
+                    worker_thread=self.source_thread
                     ))
-        
-        # Move sources to dedicated thread
-        self.source_thread = QThread()
-        for source in self.sources:
-            source.moveToThread(self.source_thread)
 
         # Start the source thread event loop
         self.source_thread.start()
@@ -136,8 +157,9 @@ class MainAppWindow(QMainWindow):
         #################
         
         self.shutters: list[Shutter] = []
+        self.shutter_thread = QThread()
         
-        for shutter_config in config.HARDWARE_CONFIG['devices']['shutters'].values():
+        for shutter_config in AppConfig.HARDWARE['devices']['shutters'].values():
             ser = serial.Serial(
                 port=shutter_config['serial']['port'], 
                 baudrate=shutter_config['serial']['baudrate'],
@@ -150,14 +172,10 @@ class MainAppWindow(QMainWindow):
                 name=shutter['name'], 
                 address=shutter['address'], 
                 ser=ser, 
-                serial_mutex=serial_mutex
+                serial_mutex=serial_mutex,
+                worker_thread=self.shutter_thread,
                 ) for shutter in shutter_config['connections']])
-        
-        # Move shutters to dedicated thread
-        self.shutter_thread = QThread()
-        for shutter in self.shutters:
-            shutter.moveToThread(self.shutter_thread)
-
+            
         # Start the shutter thread event loop
         self.shutter_thread.start()
         
@@ -232,6 +250,31 @@ class MainAppWindow(QMainWindow):
             
         # Show the popped out tab
         tab.show()
+
+    def open_docs(self):
+        is_bundled = getattr(sys, "frozen", False)
+        if is_bundled:
+            # PyInstaller bundle
+            site_path = Path(sys._MEIPASS) / "site"
+        else:
+            # running normally, assume site is on same level as src
+            site_path = definitions.ROOT_DIR / ".." / ".." / "site"
+        
+        index_file = site_path / "index.html"
+        if not index_file.exists():
+            logger.error("Couldn't find local docs!")
+            return
+        
+        # Force specific browser on bundled linux so kde-open doesn't explode
+        if is_bundled and sys.platform.startswith("linux"):
+            browser_path = shutil.which("librewolf") or shutil.which("firefox") or shutil.which("chromium") or shutil.which("google-chrome")
+            if browser_path:
+                webbrowser.get(browser_path).open(f"file:///{index_file.resolve()}")
+            else:
+                logger.error("No supported browser found! (Supported browsers: librewolf, firefox, chromium, google chrome)")
+            return
+            
+        webbrowser.open(f"file:///{index_file.resolve()}")
 
 def start():
     app = QApplication(sys.argv)# 
