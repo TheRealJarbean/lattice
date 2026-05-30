@@ -13,17 +13,12 @@ logger = logging.getLogger(__name__)
 # Custom axis for scientific notation in plots
 class ScientificAxis(pg.AxisItem):
     def tickStrings(self, values, scale, spacing):
-        return [duration_to_str(v) for v in values]
+        return [f"{v:+.2e}" for v in values]
     
 # Custom axis for time in plots
 class TimeAxis(pg.AxisItem):
     def tickStrings(self, values, scale, spacing):
-        def format_time(total_seconds):
-            minutes, seconds = divmod(total_seconds, 60)
-            hours, minutes = divmod(minutes, 60)
-            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-        
-        return [format_time(int(v)) for v in values]
+        return [duration_to_str(v) for v in values]
 
 class StackedScrollingPlotWidget(pg.GraphicsLayoutWidget):
     def __init__(self, names: list[str], data_dict: list[deque[(float, float)]], colors: list[str]):
