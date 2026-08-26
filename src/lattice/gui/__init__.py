@@ -3,7 +3,7 @@ from .pressure_tab import PressureTab
 from .recipe_tab import RecipeTab
 from .shutter_tab import ShutterTab
 from .source_tab import SourceTab
-from .widgets import InputModalWidget, PopoutTabWindow, StackedScrollingPlotWidget
+from .widgets import InputModalWidget, PopoutTabWindow, StackedScrollingPlotWidget, CameraPreview
 from .preferences_window import PreferencesWindow
 
 __all__ = [
@@ -15,5 +15,6 @@ __all__ = [
     "InputModalWidget",
     "PopoutTabWindow",
     "StackedScrollingPlotWidget",
-    "PreferencesWindow"
+    "PreferencesWindow",
+    "CameraPreview"
 ]

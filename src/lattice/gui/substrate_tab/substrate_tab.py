@@ -6,7 +6,8 @@ from PySide6.QtWidgets import (
     QFrame
 )
 from PySide6.QtCore import (
-    QLine
+    QLine,
+    Qt
 )
 from PySide6.QtGui import (
     QFont
@@ -18,6 +19,7 @@ import sys
 from lattice.gui.substrate_tab.rotation_layout import RotationLayout
 from lattice.gui.substrate_tab.loading_layout import LoadingLayout
 from lattice.gui.substrate_tab.jogging_layout import JoggingLayout
+from lattice.gui.widgets.camera_preview_widget import CameraPreview
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +60,16 @@ class SubstrateTab(QWidget):
         layout.addWidget(line)
 
         layout.addSpacing(20)
-        layout.addLayout(self.jogging)
+
+        row = QHBoxLayout()
+        row.addLayout(self.jogging)
+
+        row.addStretch()
+        col = QVBoxLayout()
+        col.addWidget(CameraPreview(0, width=480, height=270))
+        row.addLayout(col)
+
+        layout.addLayout(row)
 
         self.setLayout(layout)
 
