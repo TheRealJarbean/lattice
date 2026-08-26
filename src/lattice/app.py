@@ -20,22 +20,9 @@ from lattice import definitions
 from lattice.devices import Shutter, Source, PressureGauge
 from lattice.gui import *
 
-# Set the log level based on env variable when program is run
-# Determines which logging statements are printed to console
-# Only level used at time of writing is DEBUG
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-LOG_LEVEL_MAP = {
-    "CRITICAL": logging.CRITICAL,
-    "ERROR": logging.ERROR,
-    "WARNING": logging.WARNING,
-    "INFO": logging.INFO,
-    "DEBUG": logging.DEBUG,
-    "NOTSET": logging.NOTSET,
-}
 # Disable pymodbus logging in favor of own logging
 pymodbus_apply_logging_config(level=logging.CRITICAL)
 
-logging.basicConfig(level=LOG_LEVEL_MAP[LOG_LEVEL])
 logger = logging.getLogger(__name__)
 
 # Clear focus from focusable widgets when clicking elsewhere on the screen

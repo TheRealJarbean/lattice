@@ -10,13 +10,32 @@ from PySide6.QtWidgets import (
     QMessageBox
 )
 from PySide6.QtCore import Qt
+import logging
+import os
 
 # Local imports
 from lattice.app import MainAppWindow
 from lattice.configurator import ConfiguratorWindow
+from lattice.manipulator_assembly_test import ManipulatorTesterWindow
 
 class ModeChooser(QDialog):
     def __init__(self):
+
+        # Set the log level based on env variable when program is run
+        # Determines which logging statements are printed to console
+        # Only level used at time of writing is DEBUG
+        LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG").upper()
+        LOG_LEVEL_MAP = {
+            "CRITICAL": logging.CRITICAL,
+            "ERROR": logging.ERROR,
+            "WARNING": logging.WARNING,
+            "INFO": logging.INFO,
+            "DEBUG": logging.DEBUG,
+            "NOTSET": logging.NOTSET,
+        }
+        logging.basicConfig(level=LOG_LEVEL_MAP[LOG_LEVEL])
+        
+
         super().__init__()
         self.setWindowTitle("Lattice Launcher")
         self.setFixedSize(380, 180)
@@ -28,11 +47,13 @@ class ModeChooser(QDialog):
 
         self.radio_main = QRadioButton("Start Lattice")
         self.radio_config = QRadioButton("Open Device Configuration")
+        self.radio_manipulator = QRadioButton("Open Manipulator Tester")
         self.radio_main.setChecked(True)
 
         layout.addSpacing(10)
         layout.addWidget(self.radio_main)
         layout.addWidget(self.radio_config)
+        layout.addWidget(self.radio_manipulator)
         layout.addStretch()
 
         btn_launch = QPushButton("Start")
@@ -45,6 +66,8 @@ class ModeChooser(QDialog):
     def chosen_mode(self):
         if self.radio_config.isChecked():
             return "config"
+        if self.radio_manipulator.isChecked():
+            return "manipulator"
         return "main"
 
 
@@ -59,6 +82,8 @@ def start():
         mode = chooser.chosen_mode()
         if mode == "main":
             window = MainAppWindow()
+        if mode == "manipulator":
+            window = ManipulatorTesterWindow()
         else:
             window = ConfiguratorWindow()
         window.show()

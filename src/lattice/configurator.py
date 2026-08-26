@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 import yaml
 
-
 class PressureForm(QWidget):
     def __init__(self, on_next, initial_data=None):
         super().__init__()
