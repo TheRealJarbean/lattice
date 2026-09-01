@@ -14,6 +14,7 @@ class Motor(QObject):
 
         self.enabled = True
         self.in_motion = False
+        self.gear_ratio = 1
 
         # Create command buffer
         self.command_buffer = []
@@ -54,6 +55,44 @@ class Motor(QObject):
         if not 0 <= holding_torque_percent <= 50:
             logger.error(f"Holding torque {holding_torque_percent} outside of supported range (0-50)")
         self.send_command(f"m{holding_torque_percent}R")
+
+    def go_to_position(self, microsteps:int):
+        m = int(microsteps * self.gear_ratio)
+        self.send_command(f"A{m}R")
+
+    def go_to_position_deg(self, degrees:float):
+        self.go_to_position(self.degrees_to_microsteps(degrees))
+
+    def degrees_to_microsteps(self, deg: float):
+            # 1 rotation = 360 degrees = 51200 microsteps
+            return int(deg * 51200 / 360)
+    
+    def rpm_to_microsteps_per_second(self, rpm: float):
+        # 1 rpm = 1 rotation / 60 seconds =  51200 microsteps / 60 seconds
+        return int(rpm * 51200 / 60)
+
+    def set_speed_microsteps_per_second(self, speed):
+        s = int(speed * self.gear_ratio)
+        self.send_command(f"V{s}R")
+
+    def set_speed_rpm(self, rpm):
+        self.set_speed_microsteps_per_second(self.rpm_to_microsteps_per_second(rpm))
+
+    def step_clockwise_microsteps(self, microsteps):
+        m = int(microsteps * self.gear_ratio)
+        self.send_command(f"P{m}R")
+
+    def step_counterclockwise_microsteps(self, microsteps):
+        m = int(microsteps * self.gear_ratio)
+        self.send_command(f"D{m}R")
+
+    def step_clockwise_degrees(self, deg):
+        self.step_clockwise_microsteps(self.degrees_to_microsteps(deg))
+
+    def step_counterclockwise_degrees(self, deg):
+        self.step_counterclockwise_microsteps(self.degrees_to_microsteps(deg))
+
+
 
     def send_command(self, command: str):
         """

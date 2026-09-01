@@ -85,6 +85,7 @@ class MainAppWindow(QMainWindow):
         self.pressure_tab = PressureTab()
         self.sources_tab = SourceTab()
         self.shutter_tab = ShutterTab()
+        self.substrate_tab = SubstrateTab()
         self.recipe_tab = RecipeTab()
         self.diagnostics_tab = DiagnosticsTab()
         
@@ -93,6 +94,7 @@ class MainAppWindow(QMainWindow):
         self.tab_widget.addTab(self.pressure_tab, "Pressure")
         self.tab_widget.addTab(self.sources_tab, "Sources")
         self.tab_widget.addTab(self.shutter_tab, "Shutters")
+        self.tab_widget.addTab(self.substrate_tab, "Substrate")
         self.tab_widget.addTab(self.recipe_tab, "Recipe")
         self.tab_widget.addTab(self.diagnostics_tab, "Diagnostics")
         self.tab_widget.setMovable(True)

@@ -7,7 +7,7 @@ from lattice.devices.motor import Motor
 
 logger = logging.getLogger(__name__)
 
-class SubstrateAxis(Motor):
+class SubstrateMotor(Motor):
     position_reached = Signal(int, float) # position number, degrees
 
     def __init__(self, name: str, address: int, ser: serial.Serial, serial_mutex: QMutex, worker_thread: QThread, gear_ratio:float=1):
@@ -47,17 +47,9 @@ class SubstrateAxis(Motor):
         logger.debug(f"Substrate axis moving to position {next_pos}")
         self._go_to_position_deg.emit(next_pos, self.positions_deg[next_pos])
 
-    def degrees_to_microsteps(self, deg: float):
-        # 1 rotation = 360 degrees = 51200 microsteps
-        return int(deg * 51200 / 360)
-
-    def rpm_to_microsteps_per_second(self, rpm: float):
-        # 1 rpm = 1 rotation / 60 seconds =  51200 microsteps / 60 seconds
-        return int(rpm * 51200 / 60)
-
     def go_to_position_deg(self, pos_number:int, deg:float):
         microsteps = int(self.degrees_to_microsteps(deg) * self.gear_ratio)
-        cmd = f"A{microsteps}p{pos_number}R"
+        cmd = f"A{microsteps}p{pos_number}R" # The lowercase p command returns a string to indicate the position has been reached
         self.send_command(cmd)
 
     def check_for_pos(self, res:str):

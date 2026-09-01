@@ -166,8 +166,6 @@ class JoggingLayout(QVBoxLayout):
             self.continuous_speed_input.setEnabled(enable)
             self.continuous_start_ccw_button.setEnabled(enable)
             self.continuous_start_cw_button.setEnabled(enable)
-            self.continuous_stop_button.setEnabled(enable)
-            self.home_button.setEnabled(enable)
 
         self.continuous_start_ccw_button.clicked.connect(lambda: enable_continuous(False))
         self.continuous_start_cw_button.clicked.connect(lambda: enable_continuous(False))

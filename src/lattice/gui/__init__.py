@@ -5,6 +5,7 @@ from .shutter_tab import ShutterTab
 from .source_tab import SourceTab
 from .widgets import InputModalWidget, PopoutTabWindow, StackedScrollingPlotWidget, CameraPreview
 from .preferences_window import PreferencesWindow
+from .substrate_tab import SubstrateTab
 
 __all__ = [
     "DiagnosticsTab",
@@ -16,5 +17,6 @@ __all__ = [
     "PopoutTabWindow",
     "StackedScrollingPlotWidget",
     "PreferencesWindow",
-    "CameraPreview"
+    "CameraPreview",
+    "SubstrateTab"
 ]

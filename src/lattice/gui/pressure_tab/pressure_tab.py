@@ -7,14 +7,12 @@ from PySide6.QtWidgets import (
     QPushButton,
     QCheckBox,
     QSpinBox,
-    QAbstractSpinBox,
-    QApplication
+    QAbstractSpinBox
 )
 from PySide6.QtCore import (
     Qt,
     Signal,
-    Slot,
-    QMutex
+    Slot
 )
 from PySide6.QtGui import QColor
 from collections import deque
