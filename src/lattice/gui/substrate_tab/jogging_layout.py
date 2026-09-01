@@ -27,6 +27,8 @@ from lattice.definitions import ROOT_DIR
 logger = logging.getLogger(__name__)
 
 ASSETS_DIR = ROOT_DIR / "gui" / "assets"
+left_switch = (ASSETS_DIR / "switch_left_dark.png").as_posix()
+right_switch = (ASSETS_DIR / "switch_right_dark.png").as_posix()
 
 TOGGLE_SWITCH_STYLE = (f"""
     QCheckBox {{
@@ -39,11 +41,11 @@ TOGGLE_SWITCH_STYLE = (f"""
     }}                 
 
     QCheckBox::indicator:unchecked {{
-        image: url({ASSETS_DIR / 'switch_left_dark.png'});
+        image: url({left_switch});
     }}
                     
     QCheckBox::indicator:checked {{
-        image: url({ASSETS_DIR / 'switch_right_dark.png'});
+        image: url({right_switch});
     }}
 """)
 
