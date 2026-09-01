@@ -7,7 +7,7 @@ import time
 logger = logging.getLogger(__name__)
 
 class Motor(QObject):
-    _send_command = Signal(str) # Command
+    _send_custom_command = Signal(str) # Command
     _enable = Signal()
     _disable = Signal()
     _home = Signal()
@@ -32,7 +32,7 @@ class Motor(QObject):
         self._home.connect(self.worker.home)
         self._zero.connect(self.worker.zero)
         self._set_holding_torque.connect(self.worker.set_holding_torque)
-        self._send_command.connect(self.worker.send_custom_command)
+        self._send_custom_command.connect(self.worker.send_custom_command)
         
         # Connect worker signals
         self.worker.new_serial_data.connect(self._new_serial_data)
@@ -63,7 +63,7 @@ class Motor(QObject):
 
     def send_command(self, command: str):
         logger.debug(f"Sending command {command}")
-        self._send_command.emit(command)
+        self._send_custom_command.emit(command)
 
     @Slot(str)
     def _new_serial_data(self, data):

@@ -1,6 +1,6 @@
-from .recipe import *
+from . import recipe
 from .email_alerter import EmailAlerter
-from .timing import *
+from . import timing
 from .config import AppConfig, Config
 
 __all__ = [

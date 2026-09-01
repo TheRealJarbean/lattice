@@ -19,6 +19,7 @@ from PySide6.QtGui import (
 )
 import logging
 import sys
+from pathlib import Path
 
 # Local imports
 from lattice.definitions import ROOT_DIR

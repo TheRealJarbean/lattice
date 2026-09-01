@@ -3,17 +3,22 @@ from PySide6.QtWidgets import (
     QApplication,
     QVBoxLayout,
     QHBoxLayout,
-    QFrame
+    QFrame,
+    QPushButton
 )
 from PySide6.QtCore import (
     QLine,
-    Qt
+    Qt,
+    QMutex,
+    QThread
 )
 from PySide6.QtGui import (
     QFont
 )
 import logging
 import sys
+import serial
+import time
 
 # Local imports
 from lattice.gui.substrate_tab.rotation_layout import RotationLayout
@@ -25,14 +30,17 @@ from lattice.devices.motor import Motor
 
 logger = logging.getLogger(__name__)
 
+LOADING_MOTOR_GEAR_RATIO = 45
+SUBSTRATE_MOTOR_GEAR_RATIO = 4
+MAX_LOADING_MOTOR_MICROSTEPS = (51200 / 2) * LOADING_MOTOR_GEAR_RATIO
+
 class SubstrateTab(QWidget):
     def __init__(self, substrate_motor:SubstrateAxis=None, loading_motor:Motor=None):
         super().__init__()
         self.substrate_motor = substrate_motor
         self.loading_motor = loading_motor
-        self.loading_motor_gear_ratio = 45
-        self.substrate_motor_gear_ratio = 4
         self.substrate_rotation_speed = 0
+        self.loading_motor_position = 0
 
         layout = QVBoxLayout()
 
@@ -72,9 +80,12 @@ class SubstrateTab(QWidget):
         row.addLayout(self.jogging)
 
         row.addStretch()
-        col = QVBoxLayout()
-        col.addWidget(CameraPreview(0, width=480, height=270))
-        row.addLayout(col)
+        subrow = QHBoxLayout()
+        self.camera_preview_1 = CameraPreview(0, width=480, height=270)
+        self.camera_preview_2 = CameraPreview(1, width=480, height=270)
+        subrow.addWidget(self.camera_preview_1)
+        subrow.addWidget(self.camera_preview_2)
+        row.addLayout(subrow)
 
         layout.addLayout(row)
 
@@ -99,26 +110,30 @@ class SubstrateTab(QWidget):
         # Jogging
         self.jogging.increment_cw_button.clicked.connect(lambda: self.step_motor(clockwise=True))
         self.jogging.increment_ccw_button.clicked.connect(lambda: self.step_motor(clockwise=False))
-        self.jogging.home_button.clicked.connect(lambda: self.get_selected_motor().home())
+        self.jogging.home_button.clicked.connect(lambda: self.home_motor(self.get_selected_motor()))
         self.jogging.continuous_stop_button.clicked.connect(lambda: self.get_selected_motor().send_command("TR"))
         # TODO: Continuous jogging
+        
+        self.loading_motor.new_serial_data.connect(lambda data: print(data))
 
     def loading_go(self, degrees):
-        self.loading_motor.send_command(f"P{self.loading_deg_to_microsteps(degrees)}")
+        self.loading_motor.send_command(f"A{self.loading_deg_to_microsteps(degrees)}R")
 
     def loading_deg_to_microsteps(self, deg: float):
+        print(f"DEGREES: {deg}")
         # 1 rotation = 360 degrees = 51200 microsteps
         microsteps_unadjusted = int(deg * 51200 / 360)
 
         # Multiply by gear ratio
-        return microsteps_unadjusted * self.loading_motor_gear_ratio
+        print(f"FINAL MICROSTEPS: {microsteps_unadjusted * LOADING_MOTOR_GEAR_RATIO}")
+        return microsteps_unadjusted * LOADING_MOTOR_GEAR_RATIO
 
     def substrate_deg_to_microsteps(self, deg: float):
         # 1 rotation = 360 degrees = 51200 microsteps
         microsteps_unadjusted = int(deg * 51200 / 360)
 
         # Multiply by gear ratio
-        return microsteps_unadjusted * self.substrate_motor_gear_ratio
+        return microsteps_unadjusted * SUBSTRATE_MOTOR_GEAR_RATIO
 
     def set_rheed_angles(self, input: str):
         if input == "":
@@ -134,7 +149,7 @@ class SubstrateTab(QWidget):
         microsteps_unadjusted = int(51200/60 * rotations_per_min)
 
         # Adjust for gear ratio
-        self.substrate_rotation_speed = microsteps_unadjusted * self.substrate_motor_gear_ratio
+        self.substrate_rotation_speed = microsteps_unadjusted * SUBSTRATE_MOTOR_GEAR_RATIO
 
     def step_motor(self, clockwise=True):
         # Loading/unloading
@@ -142,27 +157,82 @@ class SubstrateTab(QWidget):
 
         if self.jogging.increment_units.currentText() == "Degrees":
             deg = self.jogging.increment_input.value()
-            raw_distance = self.substrate_deg_to_microsteps(deg) if motor == self.substrate_motor else self.loading_deg_to_microsteps(deg)
+            if deg == 0:
+                return
+            distance = self.substrate_deg_to_microsteps(deg) if motor == self.substrate_motor else self.loading_deg_to_microsteps(deg)
         else:
-            raw_distance = self.jogging.increment_input.value()
+            msteps = self.jogging.increment_input.value()
+            if msteps == 0:
+                return
+            distance = msteps * SUBSTRATE_MOTOR_GEAR_RATIO if motor == self.substrate_motor else msteps * LOADING_MOTOR_GEAR_RATIO
 
-        distance = raw_distance * self.substrate_motor_gear_ratio if motor == self.substrate_motor else raw_distance * self.loading_motor_gear_ratio
-
+        print(f"MAXIMUM: {MAX_LOADING_MOTOR_MICROSTEPS}")
         if clockwise:
-            motor.send_command(f"P{distance}R")
+            if motor == self.substrate_motor:
+                motor.send_command(f"V20000P{distance}R")
+                return
+
+            # Loading motor
+            pos = MAX_LOADING_MOTOR_MICROSTEPS
+            if not (distance + self.loading_motor_position) > MAX_LOADING_MOTOR_MICROSTEPS:
+                pos = distance + self.loading_motor_position
+
+            motor.send_command(f"V20000A{int(pos)}R")
+            self.loading_motor_position = pos
             return
 
-        motor.send_command(f"D{distance}R")
+        if motor == self.substrate_motor:
+            motor.send_command(f"V20000D{distance}R")
+            return
+
+        # Loading motor
+        pos = 0
+        if not (self.loading_motor_position - distance) < 0:
+            pos = self.loading_motor_position - distance
+
+        motor.send_command(f"V20000A{int(pos)}R")
+        self.loading_motor_position = pos
 
     def get_selected_motor(self) -> Motor|SubstrateAxis:
         if self.jogging.toggle_switch.isChecked():
+            print("LOADING MOTOR SELECTED")
             return self.loading_motor
 
         return self.substrate_motor
 
+    def synchronize_loading_motor_position(self):
+        # TODO: Connect this to new_serial data and do it
+        pass
+
+    def home_motor(self, motor:SubstrateAxis|Motor):
+        if motor==self.loading_motor:
+            self.loading_motor_position = 0
+
+        motor.home()
+
 if __name__ == "__main__":
     # Override logging to DEBUG
     logging.basicConfig(level=logging.DEBUG)
+
+    motor_thread = QThread()
+
+    ser = serial.Serial(
+        port="COM3", 
+        baudrate=9600,
+        timeout=0.1
+        )
+    
+    serial_mutex = QMutex()
+
+    loading_motor = Motor(
+        name="Loading Motor",
+        address=4,
+        ser=ser,
+        serial_mutex=serial_mutex,
+        worker_thread=motor_thread
+    )
+
+    motor_thread.start()
     
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
@@ -175,7 +245,7 @@ if __name__ == "__main__":
     window = QWidget()
     layout = QVBoxLayout()
         
-    substrate_tab = SubstrateTab()
+    substrate_tab = SubstrateTab(substrate_motor=loading_motor)
     layout.addWidget(substrate_tab)
     
     window.setLayout(layout)

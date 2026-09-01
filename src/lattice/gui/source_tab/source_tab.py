@@ -22,7 +22,7 @@ import time
 # Local imports
 from lattice.devices.source import Source
 from lattice.gui.widgets import InputModalWidget
-from lattice.utils import START_TIME, duration_to_str
+from lattice.utils.timing import START_TIME, duration_to_str
 from lattice.utils.config import AppConfig
 from .source_control_widget import SourceControlWidget
 

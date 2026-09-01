@@ -26,8 +26,8 @@ class CameraPreview(QLabel):
 
         self.current_pixmap = None
 
-    def switch_camera(self, source):
-        self.camera = Camera(source)
+    def switch_camera(self, source:int|str):
+        self.camera.change_source(source)
 
     def update_image(self, image):
         self.current_pixmap = QPixmap.fromImage(image)
@@ -45,7 +45,6 @@ class CameraPreview(QLabel):
             )
 
     def resizeEvent(self, event):
-        print(event)
         super().resizeEvent(event)
         self.update_preview()
 

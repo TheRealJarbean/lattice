@@ -13,28 +13,35 @@ class Camera(QThread):
         self.source = source
 
     def run(self):
-        cap = cv2.VideoCapture(self.source)
+        self.cap = cv2.VideoCapture(self.source, cv2.CAP_DSHOW)
 
         while self.running:
-            ret, frame = cap.read()
-            if not ret:
-                continue
+            try:
+                ret, frame = self.cap.read()
+                if not ret:
+                    continue
 
-            # OpenCV BGR -> Qt RGB
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # OpenCV BGR -> Qt RGB
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            h, w, ch = frame.shape
-            image = QImage(
-                frame.data,
-                w,
-                h,
-                ch * w,
-                QImage.Format_RGB888
-            )
+                h, w, ch = frame.shape
+                image = QImage(
+                    frame.data,
+                    w,
+                    h,
+                    ch * w,
+                    QImage.Format_RGB888
+                )
 
-            self.frameReady.emit(image)
+                self.frameReady.emit(image)
+            except:
+                pass
 
-        cap.release()
+        self.cap.release()
+
+    def change_source(self, source:int|str):
+        self.cap.release()
+        self.cap = cv2.VideoCapture(source, cv2.CAP_DSHOW)
 
     def stop(self):
         self.running = False

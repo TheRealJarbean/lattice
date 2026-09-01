@@ -6,7 +6,7 @@ import logging
 from collections import deque
 
 # Local imports
-from lattice.utils import duration_to_str
+from lattice.utils.timing import duration_to_str
 
 logger = logging.getLogger(__name__)
 
