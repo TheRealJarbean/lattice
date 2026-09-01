@@ -17,7 +17,7 @@ import csv
 import logging
 
 # Local imports
-from lattice.devices import PressureGauge, Source, Shutter
+from lattice.devices import DEVICES
 from lattice.utils import recipe
 from .ui_recipe_tab import Ui_RecipeTab
 
@@ -39,13 +39,13 @@ class WheelEventFilter(QObject):
 WHEEL_FILTER = WheelEventFilter()
 
 class RecipeTab(QWidget, Ui_RecipeTab):
-    def __init__(self, gauges: list[PressureGauge], sources: list[Source], shutters: list[Shutter]):
+    def __init__(self):
         super().__init__()
         self.setupUi(self)
 
-        self.gauges = gauges
-        self.sources = sources
-        self.shutters = shutters
+        self.gauges = DEVICES.pressure_gauges
+        self.sources = DEVICES.sources
+        self.shutters = DEVICES.shutters
         self.shutter_dict = {shutter.name: shutter for shutter in self.shutters}
         self.source_dict = {source.name: source for source in self.sources}
 

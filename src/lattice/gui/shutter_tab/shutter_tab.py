@@ -4,18 +4,18 @@ import logging
 import time
 
 # Local imports
-from lattice.devices.shutter import Shutter
+from lattice.devices import DEVICES, Shutter
 from .shutter_control_widget import ShutterControlWidget
 from .ui_shutter_tab import Ui_ShutterTab
 
 logger = logging.getLogger(__name__)
 
 class ShutterTab(QWidget, Ui_ShutterTab):
-    def __init__(self, shutters: list[Shutter]):
+    def __init__(self):
         super().__init__()
         self.setupUi(self)
         
-        self.shutters = shutters
+        self.shutters = DEVICES.shutters
 
         #########
         # SETUP #

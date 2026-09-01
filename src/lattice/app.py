@@ -11,13 +11,12 @@ import serial
 import webbrowser
 import shutil
 from pathlib import Path
-from pymodbus.client import ModbusSerialClient as ModbusClient
 from pymodbus import pymodbus_apply_logging_config
 
 # Local imports
 from lattice.utils.config import AppConfig
 from lattice import definitions
-from lattice.devices import Shutter, Source, PressureGauge
+from lattice.devices import DEVICES
 from lattice.gui import *
 
 # Disable pymodbus logging in favor of own logging
@@ -52,6 +51,9 @@ class MainAppWindow(QMainWindow):
         # Apply focus clearing filter
         QApplication.instance().installEventFilter(CLEAR_FOCUS_FILTER)
 
+        # Initialize the device manager
+        DEVICES.initialize()
+
         ##################
         # MENU BAR SETUP #
         ##################
@@ -76,115 +78,15 @@ class MainAppWindow(QMainWindow):
         docs_action.triggered.connect(self.open_docs)
         menubar.addAction(docs_action)
         
-        ##################
-        # PRESSURE SETUP #
-        ##################
-        
-        self.pressure_gauges: list[PressureGauge] = []
-        self.pressure_thread = QThread()
-
-        # Populate pressure gauge list from config file
-        for pressure_config in AppConfig.HARDWARE['devices']['pressure'].values():
-            ser = serial.Serial(
-                port=pressure_config['serial']['port'], 
-                baudrate=pressure_config['serial']['baudrate'],
-                timeout=0.1
-                )
-            
-            mutex = QMutex()
-            
-            for gauge in pressure_config['connections']:
-                self.pressure_gauges.append(PressureGauge(
-                    name=gauge['name'], 
-                    address=gauge['address'],
-                    ser=ser,
-                    serial_mutex=mutex,
-                    worker_thread=self.pressure_thread,
-                    ))
-
-        # Start the pressure thread event loop
-        self.pressure_thread.start()
-        
-        ################
-        # SOURCE SETUP #
-        ################
-        
-        self.sources: list[Source] = []
-        self.source_thread = QThread()
-        
-        if AppConfig.PARAMETER['sources']['safety'] is None:
-            AppConfig.PARAMETER['sources']['safety'] = {}
-        safety_settings = AppConfig.PARAMETER['sources']['safety']
-        for source_config in AppConfig.HARDWARE['devices']['sources'].values():
-            logger.debug(source_config)
-            logger.debug(source_config['serial']['port'])
-            client = ModbusClient(
-                port=source_config['serial']['port'], 
-                baudrate=source_config['serial']['baudrate'],
-                timeout=0.1
-                )
-            mutex = QMutex()
-            
-            for device in source_config['connections']:
-                self.sources.append(Source(
-                    name=device['name'],
-                    device_id=device['device_id'],
-                    address_set=device['address_set'],
-                    safety_settings=safety_settings.get(device['name'], {}),
-                    client=client,
-                    serial_mutex=mutex,
-                    worker_thread=self.source_thread
-                    ))
-
-        # Start the source thread event loop
-        self.source_thread.start()
-        
-        #################
-        # SHUTTER SETUP #
-        #################
-        
-        self.shutters: list[Shutter] = []
-        self.shutter_thread = QThread()
-        
-        for shutter_config in AppConfig.HARDWARE['devices']['shutters'].values():
-            ser = serial.Serial(
-                port=shutter_config['serial']['port'], 
-                baudrate=shutter_config['serial']['baudrate'],
-                timeout=0.1
-                )
-            
-            serial_mutex = QMutex()
-            
-            self.shutters.extend([Shutter(
-                name=shutter['name'], 
-                address=shutter['address'], 
-                ser=ser, 
-                serial_mutex=serial_mutex,
-                worker_thread=self.shutter_thread,
-                ) for shutter in shutter_config['connections']])
-            
-        # Start the shutter thread event loop
-        self.shutter_thread.start()
-        
         ##############
         # GUI CONFIG #
         ##############
 
-        self.pressure_tab = PressureTab(self.pressure_gauges)
-        self.sources_tab = SourceTab(self.sources)
-        self.shutter_tab = ShutterTab(self.shutters)
-
-        self.recipe_tab = RecipeTab(
-            gauges=self.pressure_gauges, 
-            sources=self.sources, 
-            shutters=self.shutters
-            )
-        
-        self.diagnostics_tab = DiagnosticsTab(
-            gauges=self.pressure_gauges,
-            sources=self.sources,
-            shutters=self.shutters
-            )
+        self.pressure_tab = PressureTab()
+        self.sources_tab = SourceTab()
+        self.shutter_tab = ShutterTab()
+        self.recipe_tab = RecipeTab()
+        self.diagnostics_tab = DiagnosticsTab()
         
         # Set tab bar context menu
         self.tab_widget = QTabWidget()

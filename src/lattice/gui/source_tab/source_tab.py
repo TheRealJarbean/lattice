@@ -20,7 +20,7 @@ import logging
 import time
 
 # Local imports
-from lattice.devices.source import Source
+from lattice.devices import Source, DEVICES
 from lattice.gui.widgets import InputModalWidget
 from lattice.utils.timing import START_TIME, duration_to_str
 from lattice.utils.config import AppConfig
@@ -34,10 +34,10 @@ class TimeAxis(pg.AxisItem):
         return [duration_to_str(v) for v in values]
 
 class SourceTab(QWidget):
-    def __init__(self, sources: list[Source]):
+    def __init__(self):
         super().__init__()
         
-        self.sources = sources
+        self.sources = DEVICES.sources
         
         #########
         # SETUP #
@@ -413,35 +413,3 @@ class SourceTab(QWidget):
         
         self.cursor_label.setPos(x, ymax)
         self.cursor_label.show()
-
-# # Run as standalone app for testing
-# if __name__ == "__main__":
-#     # Override logging to DEBUG
-#     logging.basicConfig(level=logging.DEBUG)
-    
-#     app = QApplication(sys.argv)
-#     window = QWidget()
-#     layout = QVBoxLayout()
-    
-#     names = ["Intro Gauge", "Ion Gauge", "Transfer Gauge"]
-#     addresses = ["T1", "I1", "I2"]
-#     mutex = QMutex()
-#     gauges = []
-    
-#     for i in range(len(names)):
-#         ser = MockPressureGauge(port="COM1", baudrate=9600, timeout=0.1)
-#         gauges.append(PressureGauge(
-#             name=names[i],
-#             address=addresses[i],
-#             idx=i,
-#             ser=ser,
-#             serial_mutex=mutex
-#         ))
-        
-#     pressure_tab = PressureTab(gauges)
-#     layout.addWidget(pressure_tab)
-    
-#     window.setLayout(layout)
-#     window.setWindowTitle("Pressure Tab Widget")
-#     window.show()
-#     sys.exit(app.exec())

@@ -22,7 +22,7 @@ import sys
 import logging
 
 # Local imports
-from lattice.devices import PressureGauge, MockPressureGauge
+from lattice.devices import PressureGauge, DEVICES
 from lattice.gui.widgets import StackedScrollingPlotWidget
 from lattice.utils import timing
 from .pressure_control_widget import PressureControlWidget
@@ -33,9 +33,9 @@ class PressureTab(QWidget):
     start_polling = Signal(int) # interval ms
     stop_polling = Signal()
     
-    def __init__(self, pressure_gauges: list[PressureGauge]):
+    def __init__(self):
         super().__init__()
-        self.pressure_gauges = pressure_gauges
+        self.pressure_gauges = DEVICES.pressure_gauges
         
         #########
         # SETUP #
@@ -156,34 +156,3 @@ class PressureTab(QWidget):
         
         # Don't constrain x-axis
         self.pressure_plot.update_data()
-        
-# Run as standalone app for testing
-if __name__ == "__main__":
-    # Override logging to DEBUG
-    logging.basicConfig(level=logging.DEBUG)
-    
-    app = QApplication(sys.argv)
-    window = QWidget()
-    layout = QVBoxLayout()
-    
-    names = ["Intro Gauge", "Ion Gauge", "Transfer Gauge"]
-    addresses = ["T1", "I1", "I2"]
-    mutex = QMutex()
-    gauges = []
-    
-    for i in range(len(names)):
-        ser = MockPressureGauge(port="COM1", baudrate=9600, timeout=0.1)
-        gauges.append(PressureGauge(
-            name=names[i],
-            address=addresses[i],
-            ser=ser,
-            serial_mutex=mutex
-        ))
-        
-    pressure_tab = PressureTab(gauges)
-    layout.addWidget(pressure_tab)
-    
-    window.setLayout(layout)
-    window.setWindowTitle("Pressure Tab Widget")
-    window.show()
-    sys.exit(app.exec())
