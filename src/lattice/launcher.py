@@ -16,7 +16,6 @@ import os
 # Local imports
 from lattice.app import MainAppWindow
 from lattice.configurator import ConfiguratorWindow
-from lattice.manipulator_assembly_test import ManipulatorTesterWindow
 
 class ModeChooser(QDialog):
     def __init__(self):
