@@ -12,16 +12,22 @@ class LoadingMotor(Motor):
         super().__init__(name, address, ser, serial_mutex, worker_thread)
 
         self.gear_ratio = gear_ratio
-        self.max_abs_position = int((51200 / 2) * gear_ratio)
-        self.has_been_homed = False
-        self.current_position = None
-
-    def home(self):
-        self.has_been_homed = True
-        self.send_command("f1V20000Z1000000R")
+        self.max_abs_position = int(self.degrees_to_microsteps(220) * gear_ratio)
+        self.has_been_homed = True # TODO: CHANGE BACK TO FALSE
         self.current_position = 0
 
-    def send_command(self, command):
+    def home(self):
+        self.send_command("V20000")
+        self.send_command("f1Z1000000R", homing=True)
+        self.has_been_homed = True
+        self.current_position = 0
+
+    def send_command(self, command, homing=False):
+        if homing:
+            # Bypass home check and polarity enforcement
+            super().send_command(command)
+            return
+
         if not self.has_been_homed:
             logger.warning("Loading motor cannot move until it has been homed.")
             return
@@ -47,9 +53,9 @@ class LoadingMotor(Motor):
         self._go_to_position(m)
 
     def step_clockwise_microsteps(self, microsteps):
-        m = microsteps * self.gear_ratio
+        m = int(microsteps * self.gear_ratio)
         self._go_to_position(self.current_position + m)
 
     def step_counterclockwise_microsteps(self, microsteps):
-        m = microsteps * self.gear_ratio
-        self._go_to_position(self.current_position - m)
+        m = int(microsteps * self.gear_ratio)
+        self._go_to_position(self.current_position - m)#

@@ -33,7 +33,7 @@ class SubstrateTab(QWidget):
     def __init__(self):
         super().__init__()
         self.substrate_motor = DEVICES.substrate_motor
-        self.loading_motor = DEVICES.loading_motor
+        self.loading_motor = None
 
         layout = QVBoxLayout()
 
@@ -107,7 +107,7 @@ class SubstrateTab(QWidget):
         self.jogging.continuous_stop_button.clicked.connect(lambda: self.get_selected_motor().send_command("TR"))
         # TODO: Continuous jogging
         
-        self.loading_motor.new_serial_data.connect(lambda data: print(data))
+        # self.loading_motor.new_serial_data.connect(lambda data: print(data)) TODO: UNCOMMENT THIS
 
     def loading_go(self, angle):
         self.loading_motor.go_to_position_deg(angle)

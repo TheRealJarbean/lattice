@@ -123,7 +123,7 @@ class DeviceManager():
         self.substrate_thread = QThread()
 
         ser = serial.Serial(
-            port=None,
+            port="COM3",
             baudrate=9600,
             timeout=0.1
         )
@@ -144,22 +144,22 @@ class DeviceManager():
 
         self.loading_thread = QThread()
         
-        ser = serial.Serial(
-            port=None,
-            baudrate=9600,
-            timeout=0.1
-        )
+        # ser = serial.Serial(
+        #     port=None,
+        #     baudrate=9600,
+        #     timeout=0.1
+        # )
 
-        serial_mutex = QMutex()
+        # serial_mutex = QMutex()
 
-        self.loading_motor = LoadingMotor(
-            name="Loading",
-            address=1,
-            ser=ser,
-            serial_mutex=serial_mutex,
-            worker_thread=self.loading_thread,
-            gear_ratio=LOADING_MOTOR_GEAR_RATIO
-        )
+        # self.loading_motor = LoadingMotor(
+        #     name="Loading",
+        #     address=1,
+        #     ser=ser,
+        #     serial_mutex=serial_mutex,
+        #     worker_thread=self.loading_thread,
+        #     gear_ratio=LOADING_MOTOR_GEAR_RATIO
+        # )
             
         # Start the shutter thread event loop
-        self.loading_thread.start()
+        # self.loading_thread.start()

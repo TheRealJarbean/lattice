@@ -31,7 +31,7 @@ class Motor(QObject):
         self.address = address
 
         # Connect signals
-        self._send_command.connect(self.worker._send_command)
+        self._send_command.connect(self.worker.send_command)
         self.worker.new_serial_data.connect(self._new_serial_data)
         self.worker.in_motion_changed.connect(self._update_in_motion)
 
@@ -92,8 +92,6 @@ class Motor(QObject):
     def step_counterclockwise_degrees(self, deg):
         self.step_counterclockwise_microsteps(self.degrees_to_microsteps(deg))
 
-
-
     def send_command(self, command: str):
         """
         Only include the commands themselves.
@@ -122,6 +120,7 @@ class Motor(QObject):
 
     @Slot(bool)
     def _update_in_motion(self, in_motion):
+        print(f"In motion change {in_motion}")
         self.in_motion = in_motion
 
 class MotorWorker(QObject):
@@ -159,6 +158,7 @@ class MotorWorker(QObject):
                         message = res.decode('utf-8', errors='ignore').strip()
                         self.new_serial_data.emit(f"I: {message}")
                         self.serial_mutex.unlock()
+                        self.in_motion_changed.emit(False)
                         return message
                     
             except Exception as e:

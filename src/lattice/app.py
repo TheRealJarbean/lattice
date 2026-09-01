@@ -82,21 +82,21 @@ class MainAppWindow(QMainWindow):
         # GUI CONFIG #
         ##############
 
-        self.pressure_tab = PressureTab()
-        self.sources_tab = SourceTab()
-        self.shutter_tab = ShutterTab()
+        # self.pressure_tab = PressureTab()
+        # self.sources_tab = SourceTab()
+        # self.shutter_tab = ShutterTab()
         self.substrate_tab = SubstrateTab()
-        self.recipe_tab = RecipeTab()
-        self.diagnostics_tab = DiagnosticsTab()
+        # self.recipe_tab = RecipeTab()
+        # self.diagnostics_tab = DiagnosticsTab()
         
         # Set tab bar context menu
         self.tab_widget = QTabWidget()
-        self.tab_widget.addTab(self.pressure_tab, "Pressure")
-        self.tab_widget.addTab(self.sources_tab, "Sources")
-        self.tab_widget.addTab(self.shutter_tab, "Shutters")
+        # self.tab_widget.addTab(self.pressure_tab, "Pressure")
+        # self.tab_widget.addTab(self.sources_tab, "Sources")
+        # self.tab_widget.addTab(self.shutter_tab, "Shutters")
         self.tab_widget.addTab(self.substrate_tab, "Substrate")
-        self.tab_widget.addTab(self.recipe_tab, "Recipe")
-        self.tab_widget.addTab(self.diagnostics_tab, "Diagnostics")
+        # self.tab_widget.addTab(self.recipe_tab, "Recipe")
+        # self.tab_widget.addTab(self.diagnostics_tab, "Diagnostics")
         self.tab_widget.setMovable(True)
         self.tab_widget.tabBar().setContextMenuPolicy(Qt.CustomContextMenu)
         self.tab_widget.tabBar().customContextMenuRequested.connect(self.on_tab_context_menu)
