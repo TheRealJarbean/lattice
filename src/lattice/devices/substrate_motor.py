@@ -36,7 +36,10 @@ class SubstrateMotor(Motor):
     def stop(self):
         if not self.running:
             return
-        
+
+        self.send_command("TR")
+        self.send_command("TR")
+        self.send_command("TR")
         self.running = False
     
     def go_to_next_pos(self):
@@ -45,11 +48,11 @@ class SubstrateMotor(Motor):
         
         next_pos = self.current_pos + 1 if -1 <= self.current_pos + 1 <= len(self.positions_deg) else 0
         logger.debug(f"Substrate axis moving to position {next_pos}")
-        self._go_to_position_deg.emit(next_pos, self.positions_deg[next_pos])
+        self.go_to_position_deg(next_pos, self.positions_deg[next_pos])
 
     def go_to_position_deg(self, pos_number:int, deg:float):
         microsteps = int(self.degrees_to_microsteps(deg) * self.gear_ratio)
-        cmd = f"A{microsteps}p{pos_number}R" # The lowercase p command returns a string to indicate the position has been reached
+        cmd = f"P{microsteps}p{pos_number}R" # The lowercase p command returns a string to indicate the position has been reached
         self.send_command(cmd)
 
     def check_for_pos(self, res:str):
