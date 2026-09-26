@@ -97,8 +97,8 @@ class SubstrateTab(QWidget):
         # Substrate rotation
         self.rotation.rheed_angles_button.clicked.connect(lambda: self.set_rheed_angles(self.rotation.rheed_angles_input.text()))
         self.rotation.speed_button.clicked.connect(lambda: self.set_substrate_motor_speed(int(self.rotation.speed_input.text())))
-        self.rotation.start_button.clicked.connect(lambda: self.substrate_motor.send_command(f"P0V{self.substrate_rotation_speed}R"))
-        self.rotation.stop_button.clicked.connect(lambda: self.substrate_motor.send_command("TR"))
+        self.rotation.start_button.clicked.connect(self.substrate_motor.start)
+        self.rotation.stop_button.clicked.connect(self.substrate_motor.stop)
 
         # Jogging
         self.jogging.increment_cw_button.clicked.connect(lambda: self.step_motor(clockwise=True))
