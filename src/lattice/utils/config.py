@@ -98,7 +98,7 @@ class AppConfig:
     }
     PARAMETER = Config('parameters.yaml', PARAMETER_DEFAULT)
 
-    # Load parameter config or defaults
+    # Load alert config or defaults
     ALERT_DEFAULT = {
         "sender": "",
         "recipients": []
