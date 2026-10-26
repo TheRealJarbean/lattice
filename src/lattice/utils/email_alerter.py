@@ -62,8 +62,11 @@ class EmailAlerter():
         msg.attach(MIMEText(body))
         
         # Send message
-        self.smtp.sendmail(
-            from_addr=AppConfig.ALERT['sender'], 
-            to_addrs=AppConfig.ALERT['recipients'], 
-            msg=msg.as_string()
-        )
+        try:
+            self.smtp.sendmail(
+                from_addr=AppConfig.ALERT['sender'], 
+                to_addrs=AppConfig.ALERT['recipients'], 
+                msg=msg.as_string()
+            )
+        except smtplib.SMTPException as e:
+            logger.error(f"Failed to send email: {e}")
