@@ -14,9 +14,9 @@ class EmailAlerter():
     def __init__(self):
         # Create smtp attribute
         self.smtp = None
-        
-        # This is set in the store_email_password.py script
-        password = keyring.get_password('lattice', AppConfig.ALERT['sender'])
+
+        if AppConfig.ALERT['sender'] != "":
+            password = keyring.get_password('lattice', AppConfig.ALERT['sender'])
         
         # Abort if password was not found
         if password is None:
@@ -37,6 +37,10 @@ class EmailAlerter():
             self.smtp.login(AppConfig.ALERT['sender'], password)
         except smtplib.SMTPAuthenticationError as e:
             logger.error(f"Alerter email authentication failed: {e}")
+            self.smtp = None
+            return
+        except smtplib.SMTPServerDisconnected as e:
+            logger.error(f"Unable to connect to SMTP server: {e}")
             self.smtp = None
             return
         
