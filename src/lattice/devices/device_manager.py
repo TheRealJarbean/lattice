@@ -71,13 +71,18 @@ class DeviceManager():
         if AppConfig.PARAMETER['sources']['safety'] is None:
             AppConfig.PARAMETER['sources']['safety'] = {}
         safety_settings = AppConfig.PARAMETER['sources']['safety']
+        port_client_map = {}
         for source_config in AppConfig.HARDWARE['devices']['sources']:
             port = source_config['port']
-            client = ModbusClient(
-                port=port, 
-                baudrate=baudrates[port],
-                timeout=0.1
-                )
+            if port in port_client_map.keys():
+                client = port_client_map[port]
+            else:
+                client = ModbusClient(
+                    port=port, 
+                    baudrate=baudrates[port],
+                    timeout=0.1
+                    )
+                port_client_map[port] = client
             mutex = QMutex()
             
             self.sources.append(Source(
@@ -108,14 +113,14 @@ class DeviceManager():
             else:
                 ser = serial.Serial(
                     port=port, 
-                    baudrate=shutter_config['serial']['baudrate'],
+                    baudrate=baudrates[port],
                     timeout=0.1
                     )
                 used_ports_map[port] = ser
             
             serial_mutex = QMutex()
             
-            self.shutters.extend(Shutter(
+            self.shutters.append(Shutter(
                 name=shutter_config['name'], 
                 address=shutter_config['address'], 
                 ser=ser, 
@@ -136,7 +141,7 @@ class DeviceManager():
         port = substrate_config['port']
         ser = serial.Serial(
             port=port,
-            baudrate=port,
+            baudrate=baudrates[port],
             timeout=0.1
         )
 
