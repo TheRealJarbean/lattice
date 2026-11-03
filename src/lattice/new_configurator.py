@@ -475,7 +475,7 @@ class SourceTab(QWidget):
         port = self.serial_port_input.currentText()
         settings = []
         used_names = []
-        used_device_ids = []
+        device_id_address_set_map = {}
         for row in self.source_rows:
             name = row.get_name()
             if name == "":
@@ -489,10 +489,13 @@ class SourceTab(QWidget):
             address_set = row.get_address_set()
 
             device_id = row.get_device_id()
-            if device_id in used_device_ids:
-                logger.error(f"Sources cannot have the same device_id")
-                return None
-            used_device_ids.append(device_id)
+            if device_id in device_id_address_set_map.keys():
+                if address_set in device_id_address_set_map[device_id]:
+                    logger.error(f"Sources cannot have the same device_id and address set")
+                    return None
+                device_id_address_set_map[device_id].append(address_set)
+            else:
+                device_id_address_set_map[device_id] = [address_set]
 
             # Passed basic validation at this point
             settings.append({"address_set": address_set, "device_id": device_id, "name": name, "port": port})
