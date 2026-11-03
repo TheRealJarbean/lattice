@@ -32,7 +32,7 @@ class SubstrateTab(QWidget):
     def __init__(self):
         super().__init__()
         self.substrate_motor = DEVICES.substrate_motor
-        self.loading_motor = None
+        self.loading_motor = DEVICES.loading_motor
 
         layout = QVBoxLayout()
 
