@@ -21,7 +21,7 @@ class CameraPreview(QLabel):
         )
 
         self.camera = Camera(source)
-        self.camera.frameReady.connect(self.update_image)
+        self.camera.frame_ready.connect(self.update_image)
         self.camera.start()
 
         self.current_pixmap = None

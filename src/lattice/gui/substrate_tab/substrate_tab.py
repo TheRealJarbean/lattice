@@ -24,7 +24,6 @@ import time
 from lattice.gui.substrate_tab.rotation_layout import RotationLayout
 from lattice.gui.substrate_tab.loading_layout import LoadingLayout
 from lattice.gui.substrate_tab.jogging_layout import JoggingLayout
-from lattice.gui.widgets.camera_preview_widget import CameraPreview
 from lattice.devices import DEVICES, LoadingMotor, SubstrateMotor
 
 logger = logging.getLogger(__name__)
@@ -73,12 +72,6 @@ class SubstrateTab(QWidget):
         row.addLayout(self.jogging)
 
         row.addStretch()
-        subrow = QHBoxLayout()
-        self.camera_preview_1 = CameraPreview(0, width=480, height=270)
-        self.camera_preview_2 = CameraPreview(1, width=480, height=270)
-        subrow.addWidget(self.camera_preview_1)
-        subrow.addWidget(self.camera_preview_2)
-        row.addLayout(subrow)
 
         layout.addLayout(row)
 

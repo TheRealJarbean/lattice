@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class EmailAlerter():
     def __init__(self):
+        return
         # Create smtp attribute
         self.smtp = None
 

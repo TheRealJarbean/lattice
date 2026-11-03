@@ -5,7 +5,7 @@ from PySide6.QtGui import QImage
 
 
 class Camera(QThread):
-    frameReady = Signal(QImage)
+    frame_ready = Signal(QImage)
 
     def __init__(self, source: int|str):
         super().__init__()
@@ -33,7 +33,7 @@ class Camera(QThread):
                     QImage.Format_RGB888
                 )
 
-                self.frameReady.emit(image)
+                self.frame_ready.emit(image)
             except:
                 pass
 
