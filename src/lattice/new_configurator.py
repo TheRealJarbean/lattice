@@ -33,6 +33,53 @@ class HexSpinBox(QSpinBox):
     def valueFromText(self, text):
         return int(text,16)
 
+class MotorRow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.main_layout = QHBoxLayout()
+
+        self.address_input = HexSpinBox()
+        self.address_input.setRange(0, 0xF)
+        self.serial_port_selection = QComboBox()
+        self.serial_port_selection.addItems([str(port) for port in PORTS])
+        self.serial_port_selection.setCurrentIndex(-1)
+
+        self.main_layout.addWidget(self.address_input, 1)
+        self.main_layout.addWidget(self.serial_port_selection, 1)
+        self.main_layout.setContentsMargins(5, 0, 5, 0)
+        self.setLayout(self.main_layout)
+
+    def get_address(self) -> int:
+        return self.address_input.value()
+
+    def is_port_selected(self) -> bool:
+        return self.serial_port_selection.currentIndex() != -1
+
+    def get_port(self) -> str:
+        return self.serial_port_selection.currentText()
+
+class ShutterRow(MotorRow):
+    def __init__(self):
+        super().__init__()
+        self.name_input = QLineEdit(placeholderText="Shutter Name")
+        self.remove_button = QPushButton("Remove")
+        self.remove_button.setFixedWidth(100)
+
+        # Give the remove button a container for fixed spacing
+        remove_button_container = QWidget()
+        container_layout = QHBoxLayout()
+        container_layout.addStretch()
+        container_layout.addWidget(self.remove_button)
+        container_layout.addStretch()
+        remove_button_container.setLayout(container_layout)
+
+        # Add widgets to layout
+        self.main_layout.insertWidget(0, self.name_input, 1)
+        self.main_layout.addWidget(remove_button_container, 1)
+
+    def get_name(self) -> str:
+        return self.name_input.text()
+
 class ShutterTab(QWidget):
     """
         Form data related to motors. Should ultimately return data in the following format:
@@ -54,51 +101,11 @@ class ShutterTab(QWidget):
         COM101:
             ...
     """
-    class ShutterRow(QWidget):
-        def __init__(self):
-            super().__init__()
-            layout = QHBoxLayout()
-
-            self.name_input = QLineEdit(placeholderText="Shutter Name")
-            self.address_input = HexSpinBox()
-            self.address_input.setRange(0, 0xF)
-            self.serial_port_selection = QComboBox()
-            self.serial_port_selection.addItems([str(port) for port in PORTS])
-            self.serial_port_selection.setCurrentIndex(-1)
-            self.remove_button = QPushButton("Remove")
-            self.remove_button.setFixedWidth(100)
-
-            # Give the remove button a container for fixed spacing
-            remove_button_container = QWidget()
-            container_layout = QHBoxLayout()
-            container_layout.addStretch()
-            container_layout.addWidget(self.remove_button)
-            container_layout.addStretch()
-            remove_button_container.setLayout(container_layout)
-
-            layout.addWidget(self.name_input, 1)
-            layout.addWidget(self.address_input, 1)
-            layout.addWidget(self.serial_port_selection, 1)
-            layout.addWidget(remove_button_container, 1)
-            layout.setContentsMargins(5, 0, 5, 0)
-            self.setLayout(layout)
-
-        def get_name(self) -> str:
-            return self.name_input.text()
-
-        def get_address(self) -> int:
-            return self.address_input.value()
-
-        def is_port_selected(self) -> bool:
-            return self.serial_port_selection.currentIndex() != -1
-
-        def get_port(self) -> str:
-            return self.serial_port_selection.currentText()
         
     def __init__(self):
         super().__init__()
 
-        self.shutter_rows: list["ShutterTab.ShutterRow"] = []
+        self.shutter_rows: list[ShutterRow] = []
         
         self.main_layout = QVBoxLayout(self)
         self.settings_layout = QVBoxLayout(self)
@@ -131,7 +138,7 @@ class ShutterTab(QWidget):
         self.main_layout.addStretch()
 
     def add_row(self):
-        row = self.ShutterRow()
+        row = ShutterRow()
         self.shutter_rows.append(row)
         self.settings_layout.addWidget(row)
 
@@ -145,7 +152,7 @@ class ShutterTab(QWidget):
             return
 
     def to_dict(self) -> dict | None:
-        settings = {}
+        settings = []
         used_names = []
         used_addresses = {}
         for row in self.shutter_rows:
@@ -163,25 +170,22 @@ class ShutterTab(QWidget):
                 return None
             
             port = row.get_port()
-            if port not in settings.keys():
-                settings[port] = {"connections": [], "serial": None}
             if port not in used_addresses.keys():
                 used_addresses[port] = []
 
             address = row.get_address()
             if address in used_addresses[port]:
-                logger.error(f"Shutters cannot have the same address")
+                logger.error(f"Shutters on the same serial port cannot have the same address")
                 return None
             used_addresses[port].append(address)
 
             # Passed basic validation at this point
-
-            settings[port]["connections"].append({"address": address, "name": name})
+            settings.append({"address": address, "name": name, "port": port})
 
         return settings
 
     def get_ports(self):
-        return [row.get_port() for row in self.shutter_rows if row.is_port_selected()]
+        return list(set(row.get_port() for row in self.shutter_rows if row.is_port_selected()))
 
 
 class PressureTab(QWidget):
@@ -233,6 +237,12 @@ class PressureTab(QWidget):
 
         def get_address(self) -> int:
             return self.address_input.currentText()
+
+        def set_name(self, name: str):
+            self.name_input.setText(name)
+
+        def set_address(self, address: str):
+            self.address_input.setCurrentText(address)
         
     def __init__(self):
         super().__init__()
@@ -279,12 +289,22 @@ class PressureTab(QWidget):
 
         self.main_layout.addStretch()
 
-    def add_row(self):
+    def import_existing_settings(self):
+        settings:dict = AppConfig.HARDWARE['pressure']
+        port = settings.keys()[0]
+        self.set_port(port)
+        for gauge in settings[port]['connections']:
+            row = self.add_row()
+            row.set_name(gauge['name'])
+            row.set_address(gauge['address'])
+
+    def add_row(self) -> GaugeRow:
         row = self.GaugeRow()
         self.gauge_rows.append(row)
         self.settings_layout.addWidget(row)
 
         row.remove_button.clicked.connect(lambda: self._remove_row(row))
+        return row
 
     def _remove_row(self, row:GaugeRow):
         if row in self.gauge_rows:
@@ -293,12 +313,15 @@ class PressureTab(QWidget):
             row.deleteLater()
             return
 
+    def set_port(self, port: str):
+        self.serial_port_input.setCurrentText(port)
+
     def to_dict(self) -> dict | None:
         if self.serial_port_input.currentIndex() == -1:
             logger.error("No serial port selected for gauges")
 
         port = self.serial_port_input.currentText()
-        settings = {port: {"connections": [], "serial": {"baudrate": None}}}
+        settings = []
         used_names = []
         used_addresses = []
         for row in self.gauge_rows:
@@ -318,8 +341,7 @@ class PressureTab(QWidget):
             used_addresses.append(address)
 
             # Passed basic validation at this point
-
-            settings[port]["connections"].append({"address": address, "name": name})
+            settings.append({"name": name, "address": address, "port": port})
 
         return settings
 
@@ -451,7 +473,7 @@ class SourceTab(QWidget):
             logger.error("No serial port selected for sources")
 
         port = self.serial_port_input.currentText()
-        settings = {port: {"connections": [], "serial": {"baudrate": None}}}
+        settings = []
         used_names = []
         used_device_ids = []
         for row in self.source_rows:
@@ -473,13 +495,67 @@ class SourceTab(QWidget):
             used_device_ids.append(device_id)
 
             # Passed basic validation at this point
-
-            settings[port]["connections"].append({"address_set": address_set, "device_id": device_id, "name": name})
+            settings.append({"address_set": address_set, "device_id": device_id, "name": name, "port": port})
 
         return settings
 
     def get_port(self) -> str | None:
         return self.serial_port_input.currentText() if self.serial_port_input.currentIndex() != -1 else None
+
+class ManipulatorTab(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.main_layout = QVBoxLayout()
+        self.setLayout(self.main_layout)
+
+        self.loading_motor_row = MotorRow()
+        self.substrate_motor_row = MotorRow()
+
+        # Header row
+        row = QHBoxLayout()
+        spacer = QWidget()
+        spacer.setFixedWidth(100)
+        row.addWidget(spacer)
+        row.addWidget(QLabel("Address", alignment=Qt.AlignmentFlag.AlignHCenter), 1)
+        row.addWidget(QLabel("Port", alignment=Qt.AlignmentFlag.AlignHCenter), 1)
+        self.main_layout.addLayout(row)
+
+        # Loading motor settings
+        row = QHBoxLayout()
+        label = QLabel("Loading Motor")
+        label.setFixedWidth(100)
+        row.addWidget(label)
+        row.addWidget(self.loading_motor_row)
+        self.main_layout.addLayout(row)
+        self.main_layout.addSpacing(15)
+
+        # Substrate motor settings
+        row = QHBoxLayout()
+        label = QLabel("Substrate Motor")
+        label.setFixedWidth(100)
+        row.addWidget(label)
+        row.addWidget(self.substrate_motor_row)
+        self.main_layout.addLayout(row)
+        self.main_layout.addStretch()
+
+    def to_dict(self) -> dict | None:
+        """
+        Returns two dicts in tuple, first is loading, second is substrate
+        """
+        loading = {
+            "port": self.loading_motor_row.get_port(),
+            "address": self.loading_motor_row.get_address(),
+        }
+
+        substrate = {
+            "port": self.substrate_motor_row.get_port(),
+            "address": self.substrate_motor_row.get_address()
+        }
+
+        return (loading, substrate)
+
+    def get_ports(self):
+        return [self.loading_motor_row.get_port(), self.substrate_motor_row.get_port()]
 
 class BaudrateTab(QWidget):
     BAUDRATES = [
@@ -527,6 +603,12 @@ class BaudrateTab(QWidget):
                 # Add row before bottom strech area
                 self.main_layout.insertLayout(self.main_layout.count() - 1, row)
 
+    def to_dict(self) -> dict:
+        """
+        Returns port: baudrate map
+        """
+        return {key: int(value[1].currentText()) for key, value in self.port_baudrate_input_map.items()}
+
 
 class ConfiguratorWindow(QMainWindow):
     def __init__(self):
@@ -544,12 +626,14 @@ class ConfiguratorWindow(QMainWindow):
         self.shutter_tab = ShutterTab()
         self.pressure_tab = PressureTab()
         self.source_tab = SourceTab()
+        self.manipulator_tab = ManipulatorTab()
         self.baudrate_tab = BaudrateTab()
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self.shutter_tab, "Shutters")
         self.tabs.addTab(self.pressure_tab, "Pressure Gauges")
         self.tabs.addTab(self.source_tab, "Sources")
+        self.tabs.addTab(self.manipulator_tab, "Manipulator")
         self.tabs.addTab(self.baudrate_tab, "Baudrates")
         self.tabs.currentChanged.connect(self.on_tab_change)
 
@@ -576,22 +660,32 @@ class ConfiguratorWindow(QMainWindow):
         pressure = self.pressure_tab.to_dict()
         shutters = self.shutter_tab.to_dict()
         sources = self.source_tab.to_dict()
+        manipulator = self.manipulator_tab.to_dict()
 
-        if None in [pressure, shutters, sources]:
+        if None in [pressure, shutters, sources, manipulator]:
             return None
 
-        all_ports = list(pressure.keys()) + list(shutters.keys()) + list(sources.keys())
+        loading = manipulator[0]
+        substrate = manipulator[1]
+
+        all_ports = [self.pressure_tab.get_port()] + self.shutter_tab.get_ports() + [self.source_tab.get_port] + self.manipulator_tab.get_ports()
         # Simple test to see if ports are reused
         if (len(all_ports) > len(set(all_ports))):
             logger.error(f"Different types of devices cannot use the same serial port.")
             return None
 
+        # Add Baudrates
+        port_baudrates_map = self.baudrate_tab.to_dict()
+
         return {
             "devices": {
-                "pressure": self.pressure_tab.to_dict(),
-                "shutters": self.shutter_tab.to_dict(),
-                "sources": self.source_tab.to_dict()
-            }
+                "pressure_gauges": pressure,
+                "shutters": shutters,
+                "sources": sources,
+                "loading_motor": loading,
+                "substrate_motor": substrate,
+            },
+            "baudrates": port_baudrates_map
         }
 
     def submit(self):
@@ -605,13 +699,12 @@ class ConfiguratorWindow(QMainWindow):
     def on_tab_change(self):
         # Update listed serial ports upon switching to the baudrates tab
         if self.tabs.tabBar().tabText(self.tabs.currentIndex()) == "Baudrates":
-            ports = self.shutter_tab.get_ports()
+            ports = self.shutter_tab.get_ports() + self.manipulator_tab.get_ports()
 
             for port in (self.pressure_tab.get_port(), self.source_tab.get_port()):
                 if port is not None:
                     ports.append(port)
 
-            print(ports)
             self.baudrate_tab.update_ports(ports)
 
 def start():

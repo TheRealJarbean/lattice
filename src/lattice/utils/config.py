@@ -75,10 +75,13 @@ class AppConfig:
     # Load hardware config or defaults
     HARDWARE_DEFAULT = {
         "devices": {
-            "pressure": {},
-            "sources": {},
-            "shutters": {}
-        }
+            "pressure_gauges": [],
+            "sources": [],
+            "shutters": [],
+            "loading_motor": None,
+            "substrate_motor": None
+        },
+        "baudrates": []
     }
     HARDWARE = Config('hardware.yaml', HARDWARE_DEFAULT)
 
