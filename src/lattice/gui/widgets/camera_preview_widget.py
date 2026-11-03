@@ -9,6 +9,8 @@ class CameraPreview(QLabel):
     def __init__(self, source:int|str, width:int=None, height:int=None):
         super().__init__()
 
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         # self.setFixedSize(width, height)
         if width and height:
             self.setMinimumSize(width, height)
@@ -19,6 +21,7 @@ class CameraPreview(QLabel):
             QSizePolicy.Policy.MinimumExpanding,
             QSizePolicy.Policy.MinimumExpanding
         )
+        self.setContentsMargins(0, 0, 0, 0)
 
         self.camera = Camera(source)
         self.camera.frame_ready.connect(self.update_image)
