@@ -1,9 +1,12 @@
-from . import recipe
-from .email_alert import EmailAlert
+from .recipe import *
+from .email_alerter import EmailAlerter
 from .timing import *
+from .config import AppConfig, Config
 
 __all__ = [
     "recipe",
     "timing",
-    EmailAlert
+    "EmailAlerter"
+    "Config"
+    "AppConfig"
 ]

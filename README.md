@@ -39,7 +39,7 @@ uv sync
 pyinstaller ./src/lattice/app.py
 ```
 
-## Misc Notes
+## Notes for Developers
 
 ### Using PySide6 development tools
 - `/.venv/Scripts/` contains many helpful scripts used in designing/updating this software (primarily `pyside6-designer`)
