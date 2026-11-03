@@ -213,7 +213,7 @@ class PressureTab(QWidget):
 
             self.name_input = QLineEdit(placeholderText="Gauge Name")
             self.address_input = QComboBox()
-            self.address_input.addItems(["I1", "I2"])
+            self.address_input.addItems(["I1", "I2", "I3", "I4"])
             self.address_input.setCurrentIndex(-1)
             self.remove_button = QPushButton("Remove")
             self.remove_button.setFixedWidth(100)
