@@ -33,11 +33,10 @@ class PressureGauge(QObject):
         try: 
             if self.ser and self.ser.is_open:
                 # Clear buffers
-                self.ser.reset_input_buffer()
                 
                 self.ser.write(f"{cmd}\r\n".encode('utf-8'))
                 self.ser.flush()
-                time.sleep(0.01)
+                time.sleep(1.00)
                 
                 self.data_mutex.lock()
                 self.new_serial_data.emit(self.name, f"O: {cmd}")
