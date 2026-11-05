@@ -6,22 +6,24 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel, QApplication, QMainWindow, QVBoxLayout, QSizePolicy
 
 class CameraPreview(QLabel):
-    def __init__(self, source:int|str, width:int=None, height:int=None):
+    def __init__(self, source: int | str, width: int = None, height: int = None):
         super().__init__()
 
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # self.setFixedSize(width, height)
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
+
+        self.setContentsMargins(0, 0, 0, 0)
+        self.setMargin(0)
+        self.setIndent(0)
+
+        self.aspect_ratio = 16 / 9
+
         if width and height:
             self.setMinimumSize(width, height)
-
-        self.aspect_ratio = 16 / 9 # Width to height
-
-        self.setSizePolicy(
-            QSizePolicy.Policy.MinimumExpanding,
-            QSizePolicy.Policy.MinimumExpanding
-        )
-        self.setContentsMargins(0, 0, 0, 0)
 
         self.camera = Camera(source)
         self.camera.frame_ready.connect(self.update_image)
@@ -29,7 +31,7 @@ class CameraPreview(QLabel):
 
         self.current_pixmap = None
 
-    def switch_camera(self, source:int|str):
+    def switch_camera(self, source: int | str):
         self.camera.change_source(source)
 
     def update_image(self, image):
@@ -37,15 +39,14 @@ class CameraPreview(QLabel):
         self.update_preview()
 
     def update_preview(self):
-        if self.current_pixmap:
-            self.setPixmap(
-                self.current_pixmap.scaled(
-                    self.width(),
-                    self.width() * (1 / self.aspect_ratio),
-                    Qt.KeepAspectRatio,
-                    Qt.SmoothTransformation
-                )
+        if self.current_pixmap and not self.current_pixmap.isNull():
+            scaled = self.current_pixmap.scaled(
+                self.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
             )
+
+            self.setPixmap(scaled)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
